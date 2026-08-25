@@ -21,6 +21,19 @@ drop policy "members can view household members" on household_members;
 create policy "members can view household members" on household_members
   for select using (is_household_member(household_id));
 
+-- same DRY/recursion-avoidance fix for the other two 0001 policies that still
+-- hand-rolled the EXISTS subquery: route them through is_household_member()
+-- too, so they're a single function call instead of a nested RLS evaluation
+-- on household_members. households' own id IS the household_id for that
+-- table, so it's is_household_member(id), not is_household_member(household_id).
+drop policy if exists "members can view own household" on households;
+create policy "members can view own household" on households
+  for select using (is_household_member(id));
+
+drop policy if exists "members can view own household invite codes" on invite_codes;
+create policy "members can view own household invite codes" on invite_codes
+  for select using (is_household_member(household_id));
+
 create table accounts (
   id uuid primary key default gen_random_uuid(),
   household_id uuid not null references households(id) on delete cascade,
@@ -57,7 +70,7 @@ create table budgets (
   id uuid primary key default gen_random_uuid(),
   household_id uuid not null references households(id) on delete cascade,
   category_id uuid references categories(id) on delete cascade,
-  month date not null,
+  month date not null check (month = date_trunc('month', month)::date),
   amount integer not null check (amount >= 0),
   unique (household_id, category_id, month)
 );
