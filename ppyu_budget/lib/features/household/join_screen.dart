@@ -6,11 +6,13 @@ import 'package:ppyu_budget/features/household/invite_screen.dart' show househol
 String? extractInviteCode(Uri link) => link.queryParameters['code'];
 
 // Korean copy for the known error codes join_household() raises
-// (see supabase/migrations/0001_household_schema.sql).
+// (see supabase/migrations/0001_household_schema.sql,
+// 0002_household_membership_guard.sql).
 const _joinErrorMessages = {
   'invalid_or_expired_code': '코드가 만료되었거나 잘못됐어요',
   'household_full': '이미 정원(2명)이 다 찼어요',
   'already_member': '이미 연동된 사용자예요',
+  'already_in_household': '이미 다른 배우자와 연동되어 있어요',
 };
 
 String _describeJoinError(Object e) {

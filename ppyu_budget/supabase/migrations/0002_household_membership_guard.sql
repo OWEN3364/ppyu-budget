@@ -1,3 +1,14 @@
+-- Makes the one-household-per-user rule atomic regardless of application
+-- logic: the app-level `get_my_household()` checks below give a friendly
+-- 'already_in_household' error in the common case, but under concurrent
+-- requests (e.g. the same user on two devices) two calls could both pass
+-- that check before either commits. This index turns the losing insert into
+-- a unique_violation instead of a second active household, and both
+-- functions below catch that and re-raise it as the same friendly error.
+create unique index household_members_one_active_per_user
+  on household_members (user_id)
+  where left_at is null;
+
 create or replace function get_my_household()
 returns uuid
 language sql
@@ -24,8 +35,12 @@ begin
   end if;
 
   insert into households default values returning id into new_household_id;
-  insert into household_members (household_id, user_id, role)
-  values (new_household_id, auth.uid(), 'owner');
+  begin
+    insert into household_members (household_id, user_id, role)
+    values (new_household_id, auth.uid(), 'owner');
+  exception when unique_violation then
+    raise exception 'already_in_household';
+  end;
   return new_household_id;
 end;
 $$;
@@ -73,8 +88,12 @@ begin
     raise exception 'household_full';
   end if;
 
-  insert into household_members (household_id, user_id, role)
-  values (v_invite.household_id, auth.uid(), 'member');
+  begin
+    insert into household_members (household_id, user_id, role)
+    values (v_invite.household_id, auth.uid(), 'member');
+  exception when unique_violation then
+    raise exception 'already_in_household';
+  end;
 
   update invite_codes set used_at = now(), used_by = auth.uid() where id = v_invite.id;
 
