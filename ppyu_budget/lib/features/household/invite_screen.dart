@@ -27,8 +27,10 @@ class _InviteScreenState extends State<InviteScreen> {
   Future<void> _generate() async {
     try {
       final code = await householdRepository.createInviteCode(widget.householdId);
+      if (!mounted) return;
       setState(() => _code = code);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = '초대 코드 생성 실패: $e');
     }
   }

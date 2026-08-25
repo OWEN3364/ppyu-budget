@@ -43,6 +43,7 @@ class _JoinScreenState extends State<JoinScreen> {
       await householdRepository.joinHousehold(code);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = _describeJoinError(e));
     } finally {
       if (mounted) setState(() => _joining = false);
@@ -73,8 +74,10 @@ class _JoinScreenState extends State<JoinScreen> {
               height: 250,
               child: MobileScanner(
                 onDetect: (capture) {
+                  // mobile_scanner can emit a capture with no barcodes; .first would throw.
+                  if (capture.barcodes.isEmpty || _joining) return;
                   final value = capture.barcodes.first.rawValue;
-                  if (value == null || _joining) return;
+                  if (value == null) return;
                   final code = extractInviteCode(Uri.parse(value));
                   if (code != null) _join(code);
                 },
