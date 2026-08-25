@@ -1,8 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ppyu_budget/features/household/invite_screen.dart' show householdRepository;
 
 String? extractInviteCode(Uri link) => link.queryParameters['code'];
+
+// Korean copy for the known error codes join_household() raises
+// (see supabase/migrations/0001_household_schema.sql).
+const _joinErrorMessages = {
+  'invalid_or_expired_code': '코드가 만료되었거나 잘못됐어요',
+  'household_full': '이미 정원(2명)이 다 찼어요',
+  'already_member': '이미 연동된 사용자예요',
+};
+
+String _describeJoinError(Object e) {
+  if (e is PostgrestException) {
+    return _joinErrorMessages[e.message] ?? '연동 실패: 다시 시도해주세요';
+  }
+  return '연동 실패: 다시 시도해주세요';
+}
 
 class JoinScreen extends StatefulWidget {
   const JoinScreen({super.key, this.prefillCode});
@@ -27,7 +43,7 @@ class _JoinScreenState extends State<JoinScreen> {
       await householdRepository.joinHousehold(code);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      setState(() => _error = '연동 실패: ${e.toString()}');
+      setState(() => _error = _describeJoinError(e));
     } finally {
       if (mounted) setState(() => _joining = false);
     }
