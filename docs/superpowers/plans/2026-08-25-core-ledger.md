@@ -1117,8 +1117,8 @@ git commit -m "feat: add transaction model and repository"
 ```dart
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/core/supabase_client.dart';
-import 'package:ppyu_budget/features/ledger/account_repository.dart';
-import 'package:ppyu_budget/features/ledger/category_repository.dart';
+import 'package:ppyu_budget/features/ledger/account_screen.dart' show accountRepository;
+import 'package:ppyu_budget/features/ledger/category_screen.dart' show categoryRepository;
 import 'package:ppyu_budget/features/ledger/models/account.dart';
 import 'package:ppyu_budget/features/ledger/models/category.dart';
 import 'package:ppyu_budget/features/ledger/transaction_repository.dart';
@@ -1526,7 +1526,7 @@ Expected: PASS
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/core/supabase_client.dart';
 import 'package:ppyu_budget/features/ledger/budget_repository.dart';
-import 'package:ppyu_budget/features/ledger/category_repository.dart';
+import 'package:ppyu_budget/features/ledger/category_screen.dart' show categoryRepository;
 import 'package:ppyu_budget/features/ledger/models/budget.dart';
 import 'package:ppyu_budget/features/ledger/models/category.dart';
 
