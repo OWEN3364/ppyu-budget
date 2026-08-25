@@ -1,9 +1,11 @@
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ppyu_budget/core/supabase_client.dart';
 import 'package:ppyu_budget/features/auth/login_screen.dart';
 import 'package:ppyu_budget/features/household/home_screen.dart';
+import 'package:ppyu_budget/features/household/join_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,12 +17,36 @@ void main() async {
   runApp(const PpyuApp());
 }
 
-class PpyuApp extends StatelessWidget {
+class PpyuApp extends StatefulWidget {
   const PpyuApp({super.key});
+
+  @override
+  State<PpyuApp> createState() => _PpyuAppState();
+}
+
+class _PpyuAppState extends State<PpyuApp> {
+  final _appLinks = AppLinks();
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _appLinks.uriLinkStream.listen((uri) {
+      if (uri.host == 'invite') {
+        final code = extractInviteCode(uri);
+        if (code != null) {
+          _navigatorKey.currentState?.push(
+            MaterialPageRoute(builder: (_) => JoinScreen(prefillCode: code)),
+          );
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: '쀼가계부',
       home: StreamBuilder<AuthState>(
         stream: supabase.auth.onAuthStateChange,
