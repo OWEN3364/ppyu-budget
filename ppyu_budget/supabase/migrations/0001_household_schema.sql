@@ -65,6 +65,7 @@ create or replace function create_household_and_owner()
 returns uuid
 language plpgsql
 security definer
+set search_path = public, pg_temp
 as $$
 declare
   new_household_id uuid;
@@ -80,6 +81,7 @@ create or replace function create_invite_code(p_household_id uuid)
 returns text
 language plpgsql
 security definer
+set search_path = public, pg_temp
 as $$
 declare
   v_code text;
@@ -107,6 +109,7 @@ create or replace function join_household(p_code text)
 returns uuid
 language plpgsql
 security definer
+set search_path = public, pg_temp
 as $$
 declare
   v_invite invite_codes%rowtype;
@@ -122,19 +125,21 @@ begin
 
   perform 1 from households where id = v_invite.household_id for update;
 
+  -- already-member is checked first: a member of a full household redeeming a
+  -- second valid code should hear 'already_member', not 'household_full'.
+  if exists (
+    select 1 from household_members
+    where household_id = v_invite.household_id and user_id = auth.uid() and left_at is null
+  ) then
+    raise exception 'already_member';
+  end if;
+
   select count(*) into v_member_count
   from household_members
   where household_id = v_invite.household_id and left_at is null;
 
   if v_member_count >= 2 then
     raise exception 'household_full';
-  end if;
-
-  if exists (
-    select 1 from household_members
-    where household_id = v_invite.household_id and user_id = auth.uid() and left_at is null
-  ) then
-    raise exception 'already_member';
   end if;
 
   insert into household_members (household_id, user_id, role)
@@ -145,3 +150,11 @@ begin
   return v_invite.household_id;
 end;
 $$;
+
+-- These all need auth.uid(); unauthenticated callers have no business reaching them.
+-- PUBLIC must be revoked too: functions grant EXECUTE to PUBLIC by default, and
+-- anon inherits it, so revoking from anon alone would be a no-op.
+-- `authenticated` and `service_role` keep their own explicit Supabase grants.
+revoke execute on function create_household_and_owner() from public, anon;
+revoke execute on function create_invite_code(uuid) from public, anon;
+revoke execute on function join_household(text) from public, anon;
