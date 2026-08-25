@@ -10,6 +10,7 @@ insert into auth.users (id, email) values ('22222222-2222-2222-2222-222222222222
 insert into auth.users (id, email) values ('33333333-3333-3333-3333-333333333333', 'c@test.com')
   on conflict do nothing;
 
+savepoint sp1;
 do $$
 declare
   v_household_id uuid;
@@ -25,8 +26,13 @@ begin
     raise exception 'TEST FAILED: invite code is not 6 digits';
   end if;
 end $$;
+rollback to savepoint sp1;
 
 -- 2-member cap: A creates household, B joins, C is rejected with household_full
+-- (each block below rolls back to a savepoint afterward so the same three
+-- simulated users can freely create/join households again in later blocks,
+-- as required once a user is limited to one household at a time)
+savepoint sp2;
 do $$
 declare
   v_household_id uuid;
@@ -60,9 +66,11 @@ begin
     raise exception 'TEST FAILED: third member joined a household already at the 2-member cap';
   end if;
 end $$;
+rollback to savepoint sp2;
 
 -- already_member wins over household_full: an existing member of a full household
 -- redeeming a second valid code hears already_member
+savepoint sp3;
 do $$
 declare
   v_household_id uuid;
@@ -91,8 +99,10 @@ begin
     raise exception 'TEST FAILED: an existing member joined their own household again';
   end if;
 end $$;
+rollback to savepoint sp3;
 
 -- expiry: a code past expires_at is rejected with invalid_or_expired_code
+savepoint sp4;
 do $$
 declare
   v_household_id uuid;
@@ -119,8 +129,10 @@ begin
     raise exception 'TEST FAILED: an expired invite code was accepted';
   end if;
 end $$;
+rollback to savepoint sp4;
 
 -- single-use: a code that already set used_at is rejected with invalid_or_expired_code
+savepoint sp5;
 do $$
 declare
   v_household_id uuid;
@@ -148,5 +160,6 @@ begin
     raise exception 'TEST FAILED: a single-use invite code was accepted twice';
   end if;
 end $$;
+rollback to savepoint sp5;
 
 rollback;

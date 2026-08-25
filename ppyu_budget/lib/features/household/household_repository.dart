@@ -25,4 +25,9 @@ class HouseholdRepository {
     );
     return result as String;
   }
+
+  Future<String?> getMyHousehold() async {
+    final result = await _client.rpc('get_my_household');
+    return result as String?;
+  }
 }

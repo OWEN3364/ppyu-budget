@@ -84,4 +84,34 @@ void main() {
 
     expect(await future, 'ABC123');
   });
+
+  test('getMyHousehold returns the household id when the caller is a member',
+      () async {
+    final future = repo.getMyHousehold();
+
+    final request = await mockServer.first;
+    expect(request.uri.path, endsWith('/rpc/get_my_household'));
+    request.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode('household-id-789'));
+    await request.response.close();
+
+    expect(await future, 'household-id-789');
+  });
+
+  test('getMyHousehold returns null when the caller has no household',
+      () async {
+    final future = repo.getMyHousehold();
+
+    final request = await mockServer.first;
+    expect(request.uri.path, endsWith('/rpc/get_my_household'));
+    request.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode(null));
+    await request.response.close();
+
+    expect(await future, isNull);
+  });
 }
