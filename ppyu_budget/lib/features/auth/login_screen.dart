@@ -5,9 +5,8 @@ import 'package:ppyu_budget/features/auth/auth_repository.dart';
 
 final authRepository = AuthRepository(
   auth: supabase.auth,
-  googleSignIn: GoogleSignIn(
-    serverClientId: 'YOUR_GOOGLE_WEB_CLIENT_ID', // from Prerequisite 3
-  ),
+  googleSignIn: GoogleSignIn.instance,
+  serverClientId: 'YOUR_GOOGLE_WEB_CLIENT_ID', // from Prerequisite 3
 );
 
 class LoginScreen extends StatelessWidget {
