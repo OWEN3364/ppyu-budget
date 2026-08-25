@@ -1436,7 +1436,8 @@ void main() {
     expect(result.first.categoryId, isNull);
   });
 
-  test('upsert posts a budget with on_conflict on household/category/month', () async {
+  test('upsert inserts a new budget when none exists yet for the month/category',
+      () async {
     final future = repo.upsert(
       householdId: 'household-1',
       categoryId: 'c1',
@@ -1444,26 +1445,72 @@ void main() {
       amount: 300000,
     );
 
-    final request = await mockServer.first;
-    expect(request.uri.path, endsWith('/budgets'));
-    expect(request.headers.value('prefer'), contains('resolution=merge-duplicates'));
-    final bodyStr = await utf8.decodeStream(request);
+    final selectRequest = await mockServer.first;
+    expect(selectRequest.method, 'GET');
+    expect(selectRequest.uri.path, endsWith('/budgets'));
+    expect(selectRequest.uri.queryParameters['category_id'], 'eq.c1');
+    selectRequest.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode(<Object?>[]));
+    await selectRequest.response.close();
+
+    final insertRequest = await mockServer.first;
+    expect(insertRequest.method, 'POST');
+    final bodyStr = await utf8.decodeStream(insertRequest);
     expect(jsonDecode(bodyStr), {
       'household_id': 'household-1',
       'category_id': 'c1',
       'month': '2026-09-01',
       'amount': 300000,
     });
-    request.response
+    insertRequest.response
       ..statusCode = HttpStatus.created
       ..headers.contentType = ContentType.json
       ..write(jsonEncode([
         {'id': 'b2', 'category_id': 'c1', 'month': '2026-09-01', 'amount': 300000},
       ]));
-    await request.response.close();
+    await insertRequest.response.close();
 
     final result = await future;
     expect(result.amount, 300000);
+  });
+
+  test('upsert updates the existing budget when one already exists', () async {
+    final future = repo.upsert(
+      householdId: 'household-1',
+      categoryId: null,
+      month: DateTime.utc(2026, 9),
+      amount: 1200000,
+    );
+
+    final selectRequest = await mockServer.first;
+    expect(selectRequest.method, 'GET');
+    expect(selectRequest.uri.queryParameters['category_id'], 'is.null');
+    selectRequest.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode([
+        {'id': 'b1'},
+      ]));
+    await selectRequest.response.close();
+
+    final updateRequest = await mockServer.first;
+    expect(updateRequest.method, 'PATCH');
+    expect(updateRequest.uri.queryParameters['id'], 'eq.b1');
+    final bodyStr = await utf8.decodeStream(updateRequest);
+    expect(jsonDecode(bodyStr), {'amount': 1200000});
+    updateRequest.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode([
+        {'id': 'b1', 'category_id': null, 'month': '2026-09-01', 'amount': 1200000},
+      ]));
+    await updateRequest.response.close();
+
+    final result = await future;
+    expect(result.amount, 1200000);
+    expect(result.categoryId, isNull);
   });
 }
 ```
@@ -1497,19 +1544,44 @@ class BudgetRepository {
     return rows.map(Budget.fromJson).toList();
   }
 
+  // Not a real Postgres UPSERT: PostgREST's on_conflict target can't express
+  // the partial unique index that enforces "one overall (null category_id)
+  // budget per household per month" (Postgres only infers a partial index
+  // via ON CONFLICT when the conflict target repeats its WHERE predicate,
+  // which PostgREST's on_conflict param has no way to specify). A plain
+  // check-then-write avoids relying on conflict inference entirely.
   Future<Budget> upsert({
     required String householdId,
     String? categoryId,
     required DateTime month,
     required int amount,
   }) async {
-    final rows = await _client.from('budgets').upsert({
+    var query = _client
+        .from('budgets')
+        .select('id')
+        .eq('household_id', householdId)
+        .eq('month', _monthKey(month));
+    query = categoryId == null
+        ? query.isFilter('category_id', null)
+        : query.eq('category_id', categoryId);
+    final rows = await query;
+
+    if (rows.isNotEmpty) {
+      final updated = await _client
+          .from('budgets')
+          .update({'amount': amount})
+          .eq('id', rows.first['id'] as String)
+          .select();
+      return Budget.fromJson(updated.first);
+    }
+
+    final inserted = await _client.from('budgets').insert({
       'household_id': householdId,
       'category_id': categoryId,
       'month': _monthKey(month),
       'amount': amount,
     }).select();
-    return Budget.fromJson(rows.first);
+    return Budget.fromJson(inserted.first);
   }
 }
 ```
