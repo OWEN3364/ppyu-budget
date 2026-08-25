@@ -120,6 +120,8 @@ begin
     raise exception 'invalid_or_expired_code';
   end if;
 
+  perform 1 from households where id = v_invite.household_id for update;
+
   select count(*) into v_member_count
   from household_members
   where household_id = v_invite.household_id and left_at is null;
