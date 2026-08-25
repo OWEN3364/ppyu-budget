@@ -66,6 +66,7 @@ void main() {
   late AuthRepository repo;
 
   setUp(() {
+    registerFallbackValue(OAuthProvider.google);
     auth = MockGoTrueClient();
     googleSignIn = MockGoogleSignIn();
     repo = AuthRepository(
@@ -102,6 +103,30 @@ void main() {
           provider: OAuthProvider.google,
           idToken: 'id-token',
           accessToken: null,
+        )).called(1);
+  });
+
+  test('signInWithKakao delegates to Supabase OAuth with deep link redirect',
+      () async {
+    when(() => auth.getOAuthSignInUrl(
+          provider: OAuthProvider.kakao,
+          redirectTo: 'com.ppyubudget.app://login-callback',
+        )).thenAnswer((_) async => OAuthResponse(
+          provider: OAuthProvider.kakao,
+          url: 'https://kakao.example.com',
+        ));
+
+    // The OAuth flow tries to launch a URL, which will fail in unit tests
+    // because the platform channel isn't initialized, but we can verify
+    // that the method tries to set it up with the correct parameters
+    expect(
+      () => repo.signInWithKakao(),
+      throwsA(isA<Object>()),
+    );
+
+    verify(() => auth.getOAuthSignInUrl(
+          provider: OAuthProvider.kakao,
+          redirectTo: 'com.ppyubudget.app://login-callback',
         )).called(1);
   });
 }

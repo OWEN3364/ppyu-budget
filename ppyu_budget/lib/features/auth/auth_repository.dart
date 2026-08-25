@@ -55,5 +55,12 @@ class AuthRepository {
     }
   }
 
+  Future<void> signInWithKakao() async {
+    await _auth.signInWithOAuth(
+      OAuthProvider.kakao,
+      redirectTo: 'com.ppyubudget.app://login-callback',
+    );
+  }
+
   Future<void> signOut() => _auth.signOut();
 }

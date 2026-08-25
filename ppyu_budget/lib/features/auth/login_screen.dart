@@ -16,9 +16,19 @@ class LoginScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: ElevatedButton(
-          onPressed: authRepository.signInWithGoogle,
-          child: const Text('구글로 로그인'),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: authRepository.signInWithGoogle,
+              child: const Text('구글로 로그인'),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: authRepository.signInWithKakao,
+              child: const Text('카카오로 로그인'),
+            ),
+          ],
         ),
       ),
     );
