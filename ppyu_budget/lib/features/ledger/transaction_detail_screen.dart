@@ -3,7 +3,9 @@ import 'package:ppyu_budget/features/ledger/account_screen.dart' show accountRep
 import 'package:ppyu_budget/features/ledger/category_screen.dart' show categoryRepository;
 import 'package:ppyu_budget/features/ledger/models/account.dart';
 import 'package:ppyu_budget/features/ledger/models/category.dart';
+import 'package:ppyu_budget/features/ledger/models/tag.dart';
 import 'package:ppyu_budget/features/ledger/models/transaction.dart';
+import 'package:ppyu_budget/features/ledger/tag_management_screen.dart' show tagRepository;
 import 'package:ppyu_budget/features/ledger/transaction_form_screen.dart' show transactionRepository;
 
 class TransactionDetailScreen extends StatefulWidget {
@@ -31,6 +33,8 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   late String? _categoryId = widget.transaction.categoryId;
   List<Account>? _accounts;
   List<Category>? _categories;
+  List<Tag>? _tags;
+  late final Set<String> _selectedTagIds = widget.transaction.tagIds.toSet();
   String? _error;
   bool _saving = false;
 
@@ -41,17 +45,16 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   }
 
   Future<void> _loadOptions() async {
-    // Guards against an out-of-order response: switching type twice quickly
-    // fires two loads, and the slower (older) one must not overwrite the
-    // newer one's categories.
     final requestedType = _type;
     try {
       final accounts = await accountRepository.list(widget.householdId);
       final categories = await categoryRepository.list(widget.householdId, type: _type);
+      final tags = _tags ?? await tagRepository.list(widget.householdId);
       if (!mounted || requestedType != _type) return;
       setState(() {
         _accounts = accounts;
         _categories = categories;
+        _tags = tags;
         _accountId = accounts.any((a) => a.id == _accountId)
             ? _accountId
             : (accounts.isNotEmpty ? accounts.first.id : null);
@@ -87,6 +90,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
         amount: amount,
         memo: _memoController.text.trim().isEmpty ? null : _memoController.text.trim(),
         merchant: _merchantController.text.trim().isEmpty ? null : _merchantController.text.trim(),
+        tagIds: _selectedTagIds.toList(),
       );
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -187,6 +191,24 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                     .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
                     .toList(),
                 onChanged: (v) => setState(() => _categoryId = v),
+              ),
+            if (_tags != null && _tags!.isNotEmpty)
+              Wrap(
+                spacing: 8,
+                children: _tags!.map((tag) {
+                  final selected = _selectedTagIds.contains(tag.id);
+                  return FilterChip(
+                    label: Text(tag.name),
+                    selected: selected,
+                    onSelected: (v) => setState(() {
+                      if (v) {
+                        _selectedTagIds.add(tag.id);
+                      } else {
+                        _selectedTagIds.remove(tag.id);
+                      }
+                    }),
+                  );
+                }).toList(),
               ),
             TextField(
               controller: _memoController,

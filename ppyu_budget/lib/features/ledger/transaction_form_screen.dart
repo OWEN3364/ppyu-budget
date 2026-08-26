@@ -4,6 +4,8 @@ import 'package:ppyu_budget/features/ledger/account_screen.dart' show accountRep
 import 'package:ppyu_budget/features/ledger/category_screen.dart' show categoryRepository;
 import 'package:ppyu_budget/features/ledger/models/account.dart';
 import 'package:ppyu_budget/features/ledger/models/category.dart';
+import 'package:ppyu_budget/features/ledger/models/tag.dart';
+import 'package:ppyu_budget/features/ledger/tag_management_screen.dart' show tagRepository;
 import 'package:ppyu_budget/features/ledger/transaction_repository.dart';
 
 final transactionRepository = TransactionRepository(client: supabase);
@@ -23,10 +25,12 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   String _type = 'expense';
   List<Account>? _accounts;
   List<Category>? _categories;
+  List<Tag>? _tags;
   String? _accountId;
   String? _categoryId;
   String? _error;
   bool _saving = false;
+  final Set<String> _selectedTagIds = {};
 
   @override
   void initState() {
@@ -35,24 +39,23 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   }
 
   Future<void> _loadOptions() async {
-    // Guards against an out-of-order response: switching type twice quickly
-    // fires two loads, and the slower (older) one must not overwrite the
-    // newer one's categories.
     final requestedType = _type;
     try {
       final accounts = await accountRepository.list(widget.householdId);
       final categories = await categoryRepository.list(widget.householdId, type: _type);
+      final tags = _tags ?? await tagRepository.list(widget.householdId);
       if (!mounted || requestedType != _type) return;
       setState(() {
         _accounts = accounts;
         _categories = categories;
+        _tags = tags;
         _accountId = accounts.isNotEmpty ? accounts.first.id : null;
         _categoryId = categories.isNotEmpty ? categories.first.id : null;
         _error = null;
       });
     } catch (e) {
       if (!mounted || requestedType != _type) return;
-      setState(() => _error = '계좌/카테고리를 불러오지 못했어요');
+      setState(() => _error = '계좌/카테고리/태그를 불러오지 못했어요');
     }
   }
 
@@ -83,6 +86,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         type: _type,
         amount: amount,
         memo: _memoController.text.trim().isEmpty ? null : _memoController.text.trim(),
+        tagIds: _selectedTagIds.toList(),
       );
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -149,6 +153,24 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                     .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
                     .toList(),
                 onChanged: (v) => setState(() => _categoryId = v),
+              ),
+            if (_tags != null && _tags!.isNotEmpty)
+              Wrap(
+                spacing: 8,
+                children: _tags!.map((tag) {
+                  final selected = _selectedTagIds.contains(tag.id);
+                  return FilterChip(
+                    label: Text(tag.name),
+                    selected: selected,
+                    onSelected: (v) => setState(() {
+                      if (v) {
+                        _selectedTagIds.add(tag.id);
+                      } else {
+                        _selectedTagIds.remove(tag.id);
+                      }
+                    }),
+                  );
+                }).toList(),
               ),
             TextField(
               controller: _memoController,
