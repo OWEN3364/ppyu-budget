@@ -21,6 +21,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
   List<Category>? _categories;
   List<Budget>? _budgets;
   String? _selectedCategoryId;
+  String? _error;
+  bool _saving = false;
   final _month = DateTime.now();
 
   @override
@@ -43,14 +45,25 @@ class _BudgetScreenState extends State<BudgetScreen> {
   Future<void> _save() async {
     final amount = int.tryParse(_amountController.text.trim());
     if (amount == null || amount < 0) return;
-    await budgetRepository.upsert(
-      householdId: widget.householdId,
-      categoryId: _selectedCategoryId,
-      month: _month,
-      amount: amount,
-    );
-    _amountController.clear();
-    _load();
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await budgetRepository.upsert(
+        householdId: widget.householdId,
+        categoryId: _selectedCategoryId,
+        month: _month,
+        amount: amount,
+      );
+      _amountController.clear();
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '예산 저장에 실패했어요');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -70,6 +83,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       appBar: AppBar(title: const Text('이번 달 예산')),
       body: Column(
         children: [
+          if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
           Expanded(
             child: ListView.builder(
               itemCount: budgets.length,
@@ -104,7 +118,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
                     keyboardType: TextInputType.number,
                   ),
                 ),
-                IconButton(icon: const Icon(Icons.check), onPressed: _save),
+                IconButton(
+                  icon: const Icon(Icons.check),
+                  onPressed: _saving ? null : _save,
+                ),
               ],
             ),
           ),
