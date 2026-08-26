@@ -6,6 +6,25 @@ import 'package:ppyu_budget/features/ledger/tag_management_screen.dart' show tag
 import 'package:ppyu_budget/features/ledger/transaction_detail_screen.dart';
 import 'package:ppyu_budget/features/ledger/transaction_form_screen.dart';
 
+/// Pure so it can be unit-tested without a widget harness. [query] is expected
+/// already trimmed and lowercased; tag filtering is OR (any selected tag hits).
+List<LedgerTransaction> filterTransactions(
+  List<LedgerTransaction> all,
+  String query,
+  Set<String> selectedTagIds,
+) {
+  return all.where((t) {
+    if (query.isNotEmpty) {
+      final haystack = '${t.memo ?? ''} ${t.merchant ?? ''}'.toLowerCase();
+      if (!haystack.contains(query)) return false;
+    }
+    if (selectedTagIds.isNotEmpty && !t.tagIds.any(selectedTagIds.contains)) {
+      return false;
+    }
+    return true;
+  }).toList();
+}
+
 class TransactionListScreen extends StatefulWidget {
   const TransactionListScreen({super.key, required this.householdId});
 
@@ -60,19 +79,6 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
     return '$mm/$dd $hh:$min';
   }
 
-  List<LedgerTransaction> _filtered(List<LedgerTransaction> all) {
-    return all.where((t) {
-      if (_query.isNotEmpty) {
-        final haystack = '${t.memo ?? ''} ${t.merchant ?? ''}'.toLowerCase();
-        if (!haystack.contains(_query)) return false;
-      }
-      if (_selectedTagIds.isNotEmpty && !t.tagIds.any(_selectedTagIds.contains)) {
-        return false;
-      }
-      return true;
-    }).toList();
-  }
-
   @override
   void dispose() {
     _searchController.dispose();
@@ -83,7 +89,9 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
   Widget build(BuildContext context) {
     final transactions = _transactions;
     final tags = _tags;
-    final filtered = transactions == null ? null : _filtered(transactions);
+    final filtered = transactions == null
+        ? null
+        : filterTransactions(transactions, _query, _selectedTagIds);
     return Scaffold(
       appBar: AppBar(title: const Text('거래 내역')),
       floatingActionButton: FloatingActionButton(

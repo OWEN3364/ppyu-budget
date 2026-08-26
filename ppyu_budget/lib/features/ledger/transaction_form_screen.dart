@@ -39,6 +39,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   }
 
   Future<void> _loadOptions() async {
+    // Guards against an out-of-order response: switching type twice quickly
+    // fires two loads, and the slower (older) one must not overwrite the
+    // newer one's categories.
     final requestedType = _type;
     try {
       final accounts = await accountRepository.list(widget.householdId);

@@ -59,4 +59,43 @@ void main() {
 
     expect(csv, contains('"점심, 저녁"'));
   });
+
+  test('starts with a UTF-8 BOM so Excel on Windows reads it as UTF-8', () {
+    final csv = buildTransactionsCsv(
+      transactions: const [],
+      accountNames: const {},
+      categoryNames: const {},
+      tagNames: const {},
+      memberNicknames: const {},
+    );
+
+    expect(csv.codeUnitAt(0), 0xFEFF);
+    expect(csv, startsWith('\u{FEFF}날짜,'));
+  });
+
+  test('formats the timestamp as yyyy-MM-dd HH:mm, not ISO8601', () {
+    final csv = buildTransactionsCsv(
+      transactions: [
+        LedgerTransaction(
+          id: 't1',
+          accountId: 'a1',
+          categoryId: 'c1',
+          memberId: 'm1',
+          type: 'expense',
+          amount: 1000,
+          // local (not utc) so the expected string is timezone-independent
+          occurredAt: DateTime(2026, 8, 26, 14, 33),
+          source: 'manual',
+        ),
+      ],
+      accountNames: const {},
+      categoryNames: const {},
+      tagNames: const {},
+      memberNicknames: const {},
+    );
+
+    expect(csv, contains('2026-08-26 14:33'));
+    expect(csv, isNot(contains('T14:33')));
+    expect(csv, isNot(contains('.000')));
+  });
 }

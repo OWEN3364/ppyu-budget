@@ -59,7 +59,19 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
   }
 
-  Future<void> _delete(String tagId) async {
+  Future<void> _delete(String tagId, String tagName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('태그 삭제'),
+        content: Text('"$tagName" 태그를 삭제하면 이 태그가 붙은 모든 거래에서 태그만 제거돼요. 거래 자체는 남아있어요. 삭제할까요?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('취소')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('삭제')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     setState(() {
       _saving = true;
       _error = null;
@@ -98,7 +110,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                       title: Text(tags[i].name),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete),
-                        onPressed: _saving ? null : () => _delete(tags[i].id),
+                        onPressed: _saving ? null : () => _delete(tags[i].id, tags[i].name),
                       ),
                     ),
                   ),

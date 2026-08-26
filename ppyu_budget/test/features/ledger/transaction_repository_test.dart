@@ -198,6 +198,9 @@ void main() {
     final deleteTagsRequest = iterator.current;
     expect(deleteTagsRequest.method, 'DELETE');
     expect(deleteTagsRequest.uri.path, endsWith('/transaction_tags'));
+    // the one silently-destructive filter in the phase: a wrong eq would wipe
+    // every transaction_tags row in the household without surfacing an error
+    expect(deleteTagsRequest.uri.queryParameters['transaction_id'], 'eq.t1');
     deleteTagsRequest.response.statusCode = HttpStatus.noContent;
     await deleteTagsRequest.response.close();
 
@@ -258,6 +261,7 @@ void main() {
     final deleteTagsRequest = iterator.current;
     expect(deleteTagsRequest.method, 'DELETE');
     expect(deleteTagsRequest.uri.path, endsWith('/transaction_tags'));
+    expect(deleteTagsRequest.uri.queryParameters['transaction_id'], 'eq.txn-1');
     deleteTagsRequest.response.statusCode = HttpStatus.noContent;
     await deleteTagsRequest.response.close();
 

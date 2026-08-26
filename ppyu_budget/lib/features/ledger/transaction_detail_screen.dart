@@ -45,6 +45,9 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   }
 
   Future<void> _loadOptions() async {
+    // Guards against an out-of-order response: switching type twice quickly
+    // fires two loads, and the slower (older) one must not overwrite the
+    // newer one's categories.
     final requestedType = _type;
     try {
       final accounts = await accountRepository.list(widget.householdId);
@@ -55,6 +58,10 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
         _accounts = accounts;
         _categories = categories;
         _tags = tags;
+        // A tag deleted by the spouse after this transaction was fetched would
+        // otherwise linger in _selectedTagIds with no chip to deselect it, and
+        // _save() would keep failing on the foreign key.
+        _selectedTagIds.retainAll(tags.map((t) => t.id));
         _accountId = accounts.any((a) => a.id == _accountId)
             ? _accountId
             : (accounts.isNotEmpty ? accounts.first.id : null);

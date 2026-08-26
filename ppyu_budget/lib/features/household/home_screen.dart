@@ -26,6 +26,11 @@ class _HomeScreenState extends State<HomeScreen> {
   late final HouseholdRepository _repository =
       widget._repository ?? householdRepository;
 
+  // Owned by the State, not by _setNickname: showDialog's future resolves at
+  // Navigator.pop, before the closing animation ends, so a locally-disposed
+  // controller could outlive its TextField mid-transition.
+  final _nicknameController = TextEditingController();
+
   bool _loading = true;
   bool _creating = false;
   bool _settingNickname = false;
@@ -37,6 +42,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadHousehold();
+  }
+
+  @override
+  void dispose() {
+    _nicknameController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadHousehold() async {
@@ -65,23 +76,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _setNickname(String householdId) async {
-    final controller = TextEditingController();
+    _nicknameController.clear();
     final nickname = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('닉네임 설정'),
-        content: TextField(controller: controller, decoration: const InputDecoration(labelText: '닉네임')),
+        content: TextField(controller: _nicknameController, decoration: const InputDecoration(labelText: '닉네임')),
         actions: [
           TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('취소')),
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
+            onPressed: () => Navigator.of(dialogContext).pop(_nicknameController.text.trim()),
             child: const Text('저장'),
           ),
         ],
       ),
     );
-    controller.dispose();
-    if (nickname == null || nickname.isEmpty) return;
+    if (nickname == null || nickname.isEmpty || !mounted) return;
     setState(() => _settingNickname = true);
     try {
       await _repository.setMyNickname(householdId, nickname);
