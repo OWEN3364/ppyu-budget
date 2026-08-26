@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:ppyu_budget/features/household/household_repository.dart';
 import 'package:ppyu_budget/features/household/invite_screen.dart';
 import 'package:ppyu_budget/features/household/join_screen.dart';
+import 'package:ppyu_budget/features/ledger/account_screen.dart';
+import 'package:ppyu_budget/features/ledger/budget_screen.dart';
+import 'package:ppyu_budget/features/ledger/category_screen.dart';
+import 'package:ppyu_budget/features/ledger/savings_goal_screen.dart';
+import 'package:ppyu_budget/features/ledger/transaction_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, HouseholdRepository? repository})
@@ -57,8 +62,43 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (_householdId != null) {
-      return const Scaffold(
-        body: Center(child: Text('배우자와 연동됐어요')),
+      final householdId = _householdId!;
+      return Scaffold(
+        appBar: AppBar(title: const Text('쀼가계부')),
+        body: ListView(
+          children: [
+            ListTile(
+              title: const Text('거래 내역'),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => TransactionListScreen(householdId: householdId),
+              )),
+            ),
+            ListTile(
+              title: const Text('계좌/카드 관리'),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => AccountScreen(householdId: householdId),
+              )),
+            ),
+            ListTile(
+              title: const Text('카테고리 관리'),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => CategoryScreen(householdId: householdId),
+              )),
+            ),
+            ListTile(
+              title: const Text('이번 달 예산'),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => BudgetScreen(householdId: householdId),
+              )),
+            ),
+            ListTile(
+              title: const Text('저축 목표'),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => SavingsGoalScreen(householdId: householdId),
+              )),
+            ),
+          ],
+        ),
       );
     }
 

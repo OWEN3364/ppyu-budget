@@ -67,6 +67,7 @@ void main() {
 
     expect(find.text('배우자 초대하기'), findsNothing);
     expect(find.text('초대 코드로 연동하기'), findsNothing);
+    expect(find.text('거래 내역'), findsOneWidget);
   });
 
   testWidgets('shows a loading indicator while the household lookup is in flight',
