@@ -45,4 +45,26 @@ void main() {
     expect(result, isNotNull);
     expect(result!.merchant, '삼성페이');
   });
+
+  // Partial guarantee only — see the parser's tuning checklist. Short digit
+  // groups (e.g. "14:33") still survive; the strip covers card last-4 and
+  // amount/balance figures, and the cap bounds how much text can escape.
+  test('merchant does not leak the card last-4 or the cumulative balance', () {
+    final result = NotificationParser.parse(
+      'com.shinhancard.smartshinhan',
+      '신한카드(1234) 12,000원 일시불승인 홍길동님 08/26 14:33 스타벅스강남점 누적 350,000원',
+    );
+    expect(result, isNotNull);
+    expect(result!.amount, 12000);
+    expect(result.merchant, contains('스타벅스강남점'));
+    expect(result.merchant, isNot(contains('1234')));
+    expect(result.merchant, isNot(contains('350,000')));
+    expect(result.merchant.length, lessThanOrEqualTo(40));
+  });
+
+  test('merchant falls back to the issuer name when digit-stripping empties it', () {
+    final result = NotificationParser.parse('com.shinhancard.smartshinhan', '1,000원 승인 1234');
+    expect(result, isNotNull);
+    expect(result!.merchant, '신한카드');
+  });
 }

@@ -34,6 +34,18 @@ class NotificationParser {
   // list (or add per-issuer overrides keyed on packageName) once real
   // notification samples from the user's own bank/card apps are collected —
   // this is expected to need iteration, not a one-shot solution.
+  //
+  // Tuning checklist for the real-device pass:
+  // - Cancellations/refunds (알림 containing 취소/환불) currently parse as
+  //   positive expenses with the wrong sign — not yet handled, needs real
+  //   samples to fix correctly.
+  // - The amount regex uses `firstMatch`, which may grab a 누적/잔액 balance
+  //   figure instead of the actual transaction amount on some notification
+  //   formats — needs verification against real samples.
+  // - `merchant` must never become the verbatim notification text (privacy
+  //   constraint: raw notification text must not cross into Supabase). The
+  //   digit-stripping + length cap below helps but is not a complete
+  //   guarantee; anyone extending this parser must preserve that property.
   static ParsedNotification? parse(String packageName, String text) {
     final issuerName = _knownIssuers[packageName];
     if (issuerName == null) return null;
@@ -46,6 +58,12 @@ class NotificationParser {
         .replaceAll(amountMatch.group(0)!, '')
         .replaceAll(RegExp(r'(승인|결제|사용|일시불|누적|완료)'), '')
         .trim();
+    // Strip digit runs of 3+ (card last-4, other amounts, dates written as
+    // digits) and cap the length so `merchant` can't carry near-verbatim
+    // notification text — cardholder name, timestamps, cumulative balance —
+    // into Supabase.
+    merchant = merchant.replaceAll(RegExp(r'[\d,]{3,}'), '').trim();
+    if (merchant.length > 40) merchant = merchant.substring(0, 40);
     if (merchant.isEmpty) merchant = issuerName;
 
     return ParsedNotification(
