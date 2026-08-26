@@ -22,6 +22,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
   String _type = 'expense';
   List<Category>? _categories;
   String? _error;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -33,7 +34,10 @@ class _CategoryScreenState extends State<CategoryScreen> {
     try {
       final categories = await _repository.list(widget.householdId);
       if (!mounted) return;
-      setState(() => _categories = categories);
+      setState(() {
+        _categories = categories;
+        _error = null;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = '카테고리를 불러오지 못했어요');
@@ -43,6 +47,10 @@ class _CategoryScreenState extends State<CategoryScreen> {
   Future<void> _add() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       await _repository.create(widget.householdId, name, _type);
       _nameController.clear();
@@ -50,6 +58,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = '카테고리 추가에 실패했어요');
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -96,7 +106,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                   ],
                   onChanged: (v) => setState(() => _type = v ?? 'expense'),
                 ),
-                IconButton(icon: const Icon(Icons.add), onPressed: _add),
+                IconButton(icon: const Icon(Icons.add), onPressed: _saving ? null : _add),
               ],
             ),
           ),

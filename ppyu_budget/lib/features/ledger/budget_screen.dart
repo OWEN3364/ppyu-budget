@@ -32,14 +32,20 @@ class _BudgetScreenState extends State<BudgetScreen> {
   }
 
   Future<void> _load() async {
-    final categories = await categoryRepository.list(widget.householdId, type: 'expense');
-    final budgets = await budgetRepository.list(widget.householdId, _month);
-    if (!mounted) return;
-    setState(() {
-      _categories = categories;
-      _budgets = budgets;
-      _selectedCategoryId = categories.isNotEmpty ? categories.first.id : null;
-    });
+    try {
+      final categories = await categoryRepository.list(widget.householdId, type: 'expense');
+      final budgets = await budgetRepository.list(widget.householdId, _month);
+      if (!mounted) return;
+      setState(() {
+        _categories = categories;
+        _budgets = budgets;
+        _selectedCategoryId = categories.isNotEmpty ? categories.first.id : null;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '예산을 불러오지 못했어요');
+    }
   }
 
   Future<void> _save() async {
@@ -77,7 +83,12 @@ class _BudgetScreenState extends State<BudgetScreen> {
     final categories = _categories;
     final budgets = _budgets;
     if (categories == null || budgets == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        appBar: AppBar(title: const Text('이번 달 예산')),
+        body: _error != null
+            ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+            : const Center(child: CircularProgressIndicator()),
+      );
     }
     return Scaffold(
       appBar: AppBar(title: const Text('이번 달 예산')),

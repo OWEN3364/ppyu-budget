@@ -35,15 +35,21 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   }
 
   Future<void> _loadOptions() async {
-    final accounts = await accountRepository.list(widget.householdId);
-    final categories = await categoryRepository.list(widget.householdId, type: _type);
-    if (!mounted) return;
-    setState(() {
-      _accounts = accounts;
-      _categories = categories;
-      _accountId = accounts.isNotEmpty ? accounts.first.id : null;
-      _categoryId = categories.isNotEmpty ? categories.first.id : null;
-    });
+    try {
+      final accounts = await accountRepository.list(widget.householdId);
+      final categories = await categoryRepository.list(widget.householdId, type: _type);
+      if (!mounted) return;
+      setState(() {
+        _accounts = accounts;
+        _categories = categories;
+        _accountId = accounts.isNotEmpty ? accounts.first.id : null;
+        _categoryId = categories.isNotEmpty ? categories.first.id : null;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '계좌/카테고리를 불러오지 못했어요');
+    }
   }
 
   Future<void> _save() async {
@@ -95,7 +101,12 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     final accounts = _accounts;
     final categories = _categories;
     if (accounts == null || categories == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        appBar: AppBar(title: const Text('거래 추가')),
+        body: _error != null
+            ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+            : const Center(child: CircularProgressIndicator()),
+      );
     }
     return Scaffold(
       appBar: AppBar(title: const Text('거래 추가')),

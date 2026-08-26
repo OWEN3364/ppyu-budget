@@ -31,7 +31,10 @@ class _SavingsGoalScreenState extends State<SavingsGoalScreen> {
     try {
       final goals = await savingsGoalRepository.list(widget.householdId);
       if (!mounted) return;
-      setState(() => _goals = goals);
+      setState(() {
+        _goals = goals;
+        _error = null;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = '저축 목표를 불러오지 못했어요');

@@ -17,6 +17,9 @@ revoke execute on function is_household_member(uuid) from public, anon;
 -- itself, which recurses under a real (non-bypassrls) role. is_household_member()
 -- is security definer (owned by postgres, which bypasses RLS), so routing
 -- through it breaks the recursion using the standard Postgres pattern.
+-- Dropping the `security definer` qualifier from is_household_member() would
+-- silently reintroduce that infinite recursion, since the function body's
+-- select on household_members would then be RLS-checked by this very policy.
 drop policy "members can view household members" on household_members;
 create policy "members can view household members" on household_members
   for select using (is_household_member(household_id));

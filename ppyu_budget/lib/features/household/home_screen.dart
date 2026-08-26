@@ -25,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   bool _creating = false;
   String? _householdId;
+  String? _error;
 
   @override
   void initState() {
@@ -45,14 +46,16 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _creating = true);
     try {
       final householdId = await _repository.createHousehold();
-      if (mounted) {
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => InviteScreen(householdId: householdId),
-        ));
-      }
+      if (!mounted) return;
+      await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => InviteScreen(householdId: householdId),
+      ));
+    } catch (e) {
+      if (mounted) setState(() => _error = '초대 생성에 실패했어요');
     } finally {
       if (mounted) setState(() => _creating = false);
     }
+    await _loadHousehold();
   }
 
   @override
@@ -67,6 +70,12 @@ class _HomeScreenState extends State<HomeScreen> {
         appBar: AppBar(title: const Text('쀼가계부')),
         body: ListView(
           children: [
+            ListTile(
+              title: const Text('배우자 초대'),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => InviteScreen(householdId: householdId),
+              )),
+            ),
             ListTile(
               title: const Text('거래 내역'),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
@@ -112,12 +121,17 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const Text('배우자 초대하기'),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const JoinScreen()),
-              ),
+              onPressed: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const JoinScreen()),
+                );
+                _loadHousehold();
+              },
               child: const Text('초대 코드로 연동하기'),
             ),
-          ],
+            if (_error != null)
+              Text(_error!, style: const TextStyle(color: Colors.red)),
+],
         ),
       ),
     );

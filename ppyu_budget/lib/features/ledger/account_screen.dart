@@ -22,6 +22,7 @@ class _AccountScreenState extends State<AccountScreen> {
   String _type = 'card';
   List<Account>? _accounts;
   String? _error;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -33,7 +34,10 @@ class _AccountScreenState extends State<AccountScreen> {
     try {
       final accounts = await _repository.list(widget.householdId);
       if (!mounted) return;
-      setState(() => _accounts = accounts);
+      setState(() {
+        _accounts = accounts;
+        _error = null;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = '계좌 목록을 불러오지 못했어요');
@@ -43,6 +47,10 @@ class _AccountScreenState extends State<AccountScreen> {
   Future<void> _add() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       await _repository.create(widget.householdId, name, _type);
       _nameController.clear();
@@ -50,6 +58,8 @@ class _AccountScreenState extends State<AccountScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = '계좌 추가에 실패했어요');
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -97,7 +107,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   ],
                   onChanged: (v) => setState(() => _type = v ?? 'card'),
                 ),
-                IconButton(icon: const Icon(Icons.add), onPressed: _add),
+                IconButton(icon: const Icon(Icons.add), onPressed: _saving ? null : _add),
               ],
             ),
           ),

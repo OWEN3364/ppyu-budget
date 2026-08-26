@@ -13,6 +13,7 @@ class TransactionListScreen extends StatefulWidget {
 
 class _TransactionListScreenState extends State<TransactionListScreen> {
   List<LedgerTransaction>? _transactions;
+  String? _error;
 
   @override
   void initState() {
@@ -21,9 +22,17 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
   }
 
   Future<void> _load() async {
-    final transactions = await transactionRepository.list(widget.householdId);
-    if (!mounted) return;
-    setState(() => _transactions = transactions);
+    try {
+      final transactions = await transactionRepository.list(widget.householdId);
+      if (!mounted) return;
+      setState(() {
+        _transactions = transactions;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '거래 내역을 불러오지 못했어요');
+    }
   }
 
   @override
@@ -40,7 +49,9 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
         },
         child: const Icon(Icons.add),
       ),
-      body: transactions == null
+      body: _error != null
+          ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+          : transactions == null
           ? const Center(child: CircularProgressIndicator())
           : transactions.isEmpty
               ? const Center(child: Text('아직 거래 내역이 없어요'))
