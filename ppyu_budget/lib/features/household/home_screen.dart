@@ -9,6 +9,8 @@ import 'package:ppyu_budget/features/ledger/savings_goal_screen.dart';
 import 'package:ppyu_budget/features/ledger/tag_management_screen.dart';
 import 'package:ppyu_budget/features/ledger/transaction_list_screen.dart';
 import 'package:ppyu_budget/features/notification_capture/notification_onboarding_screen.dart';
+import 'package:ppyu_budget/features/stats/models/spending_recommendation.dart';
+import 'package:ppyu_budget/features/stats/stats_screen.dart' show StatsScreen, statsRepository;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, HouseholdRepository? repository})
@@ -29,6 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _settingNickname = false;
   String? _householdId;
   String? _error;
+  Future<List<SpendingRecommendation>>? _recommendationsFuture;
 
   @override
   void initState() {
@@ -42,7 +45,23 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _householdId = householdId;
       _loading = false;
+      _recommendationsFuture = householdId != null ? _fetchRecommendations(householdId) : null;
     });
+  }
+
+  // Swallows failures (including a synchronous throw from the statsRepository
+  // singleton itself, e.g. Supabase not yet initialized — as in widget tests
+  // that fake out HouseholdRepository but never call Supabase.initialize())
+  // into an empty list rather than an errored Future. FutureBuilder already
+  // hides the card when the list is empty, and this avoids returning an
+  // already-failed Future for a widget that may not have mounted yet to
+  // attach an error handler.
+  Future<List<SpendingRecommendation>> _fetchRecommendations(String householdId) async {
+    try {
+      return await statsRepository.spendingRecommendations(householdId, DateTime.now());
+    } catch (_) {
+      return const [];
+    }
   }
 
   Future<void> _setNickname(String householdId) async {
@@ -105,6 +124,20 @@ class _HomeScreenState extends State<HomeScreen> {
         appBar: AppBar(title: const Text('쀼가계부')),
         body: ListView(
           children: [
+            FutureBuilder<List<SpendingRecommendation>>(
+              future: _recommendationsFuture,
+              builder: (context, snapshot) {
+                final recs = snapshot.data;
+                if (recs == null || recs.isEmpty) return const SizedBox.shrink();
+                return Card(
+                  margin: const EdgeInsets.all(8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text('${recs.first.categoryName} 지출이 전월 대비 ${recs.first.changeRatio.toStringAsFixed(0)}% 늘었어요'),
+                  ),
+                );
+              },
+            ),
             ListTile(
               title: const Text('배우자 초대'),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
@@ -115,6 +148,12 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('거래 내역'),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => TransactionListScreen(householdId: householdId),
+              )),
+            ),
+            ListTile(
+              title: const Text('통계'),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => StatsScreen(householdId: householdId),
               )),
             ),
             ListTile(
