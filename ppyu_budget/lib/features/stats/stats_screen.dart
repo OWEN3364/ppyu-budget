@@ -1,6 +1,15 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:ppyu_budget/core/supabase_client.dart';
+import 'package:ppyu_budget/features/ledger/account_screen.dart' show accountRepository;
+import 'package:ppyu_budget/features/ledger/category_screen.dart' show categoryRepository;
+import 'package:ppyu_budget/features/ledger/tag_management_screen.dart' show tagRepository;
+import 'package:ppyu_budget/features/ledger/transaction_form_screen.dart' show transactionRepository;
+import 'package:ppyu_budget/features/household/invite_screen.dart' show householdRepository;
+import 'package:ppyu_budget/features/stats/csv_export.dart';
 import 'package:ppyu_budget/features/stats/models/category_summary.dart';
 import 'package:ppyu_budget/features/stats/models/spending_recommendation.dart';
 import 'package:ppyu_budget/features/stats/stats_repository.dart';
@@ -59,6 +68,47 @@ class _StatsScreenState extends State<StatsScreen> {
     _load();
   }
 
+  bool _exporting = false;
+
+  Future<void> _exportCsv() async {
+    setState(() => _exporting = true);
+    try {
+      final allTransactions = await transactionRepository.list(widget.householdId);
+      final monthTransactions = allTransactions
+          .where((t) =>
+              t.occurredAt.toLocal().year == _month.year &&
+              t.occurredAt.toLocal().month == _month.month)
+          .toList();
+      if (monthTransactions.isEmpty) {
+        if (mounted) setState(() => _error = '내보낼 거래가 없어요');
+        return;
+      }
+      final accounts = await accountRepository.list(widget.householdId);
+      final categories = await categoryRepository.list(widget.householdId);
+      final tags = await tagRepository.list(widget.householdId);
+      final nicknames = await householdRepository.nicknamesByMemberId(widget.householdId);
+
+      final csv = buildTransactionsCsv(
+        transactions: monthTransactions,
+        accountNames: {for (final a in accounts) a.id: a.name},
+        categoryNames: {for (final c in categories) c.id: c.name},
+        tagNames: {for (final t in tags) t.id: t.name},
+        memberNicknames: nicknames,
+      );
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile.fromData(utf8.encode(csv), mimeType: 'text/csv')],
+          fileNameOverrides: ['${_month.year}-${_month.month}-transactions.csv'],
+        ),
+      );
+    } catch (e) {
+      if (mounted) setState(() => _error = 'CSV 내보내기에 실패했어요');
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final summary = _summary;
@@ -76,6 +126,17 @@ class _StatsScreenState extends State<StatsScreen> {
               Text('${_month.year}년 ${_month.month}월'),
               IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => _changeMonth(1)),
             ],
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextButton.icon(
+                onPressed: _exporting ? null : _exportCsv,
+                icon: const Icon(Icons.share),
+                label: const Text('CSV 내보내기'),
+              ),
+            ),
           ),
           if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
           if (summary == null)
