@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -150,6 +151,7 @@ void main() {
   });
 
   test('update patches an existing transaction', () async {
+    final iterator = StreamIterator(mockServer);
     final future = repo.update(
       id: 't1',
       accountId: 'a2',
@@ -160,10 +162,11 @@ void main() {
       merchant: '스타벅스 강남점',
     );
 
-    final request = await mockServer.first;
-    expect(request.method, 'PATCH');
-    expect(request.uri.queryParameters['id'], 'eq.t1');
-    final bodyStr = await utf8.decodeStream(request);
+    await iterator.moveNext();
+    final patchRequest = iterator.current;
+    expect(patchRequest.method, 'PATCH');
+    expect(patchRequest.uri.queryParameters['id'], 'eq.t1');
+    final bodyStr = await utf8.decodeStream(patchRequest);
     expect(jsonDecode(bodyStr), {
       'account_id': 'a2',
       'category_id': 'c2',
@@ -172,7 +175,7 @@ void main() {
       'memo': '수정됨',
       'merchant': '스타벅스 강남점',
     });
-    request.response
+    patchRequest.response
       ..statusCode = HttpStatus.ok
       ..headers.contentType = ContentType.json
       ..write(jsonEncode([
@@ -189,7 +192,14 @@ void main() {
           'merchant': '스타벅스 강남점',
         },
       ]));
-    await request.response.close();
+    await patchRequest.response.close();
+
+    await iterator.moveNext();
+    final deleteTagsRequest = iterator.current;
+    expect(deleteTagsRequest.method, 'DELETE');
+    expect(deleteTagsRequest.uri.path, endsWith('/transaction_tags'));
+    deleteTagsRequest.response.statusCode = HttpStatus.noContent;
+    await deleteTagsRequest.response.close();
 
     final result = await future;
     expect(result.amount, 7000);
@@ -207,5 +217,64 @@ void main() {
     await request.response.close();
 
     await future;
+  });
+
+  test('create saves the transaction then replaces its tags', () async {
+    final iterator = StreamIterator(mockServer);
+    final future = repo.create(
+      householdId: 'household-1',
+      accountId: 'account-1',
+      categoryId: 'category-1',
+      memberId: 'member-1',
+      type: 'expense',
+      amount: 5000,
+      tagIds: ['tag-1', 'tag-2'],
+    );
+
+    await iterator.moveNext();
+    final insertRequest = iterator.current;
+    expect(insertRequest.method, 'POST');
+    expect(insertRequest.uri.path, endsWith('/transactions'));
+    insertRequest.response
+      ..statusCode = HttpStatus.created
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode([
+        {
+          'id': 'txn-1',
+          'account_id': 'account-1',
+          'category_id': 'category-1',
+          'member_id': 'member-1',
+          'type': 'expense',
+          'amount': 5000,
+          'occurred_at': '2026-08-26T00:00:00Z',
+          'source': 'manual',
+          'memo': null,
+          'merchant': null,
+        },
+      ]));
+    await insertRequest.response.close();
+
+    await iterator.moveNext();
+    final deleteTagsRequest = iterator.current;
+    expect(deleteTagsRequest.method, 'DELETE');
+    expect(deleteTagsRequest.uri.path, endsWith('/transaction_tags'));
+    deleteTagsRequest.response.statusCode = HttpStatus.noContent;
+    await deleteTagsRequest.response.close();
+
+    await iterator.moveNext();
+    final insertTagsRequest = iterator.current;
+    expect(insertTagsRequest.method, 'POST');
+    expect(insertTagsRequest.uri.path, endsWith('/transaction_tags'));
+    final bodyStr = await utf8.decodeStream(insertTagsRequest);
+    expect(jsonDecode(bodyStr), [
+      {'transaction_id': 'txn-1', 'tag_id': 'tag-1'},
+      {'transaction_id': 'txn-1', 'tag_id': 'tag-2'},
+    ]);
+    insertTagsRequest.response.statusCode = HttpStatus.created;
+    await insertTagsRequest.response.close();
+
+    final result = await future;
+    expect(result.id, 'txn-1');
+    expect(result.tagIds, ['tag-1', 'tag-2']);
   });
 }

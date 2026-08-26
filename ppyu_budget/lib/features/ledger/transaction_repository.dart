@@ -9,7 +9,7 @@ class TransactionRepository {
   Future<List<LedgerTransaction>> list(String householdId) async {
     final rows = await _client
         .from('transactions')
-        .select()
+        .select('*, transaction_tags(tag_id)')
         .eq('household_id', householdId)
         .order('occurred_at', ascending: false);
     return rows.map(LedgerTransaction.fromJson).toList();
@@ -25,6 +25,7 @@ class TransactionRepository {
     String? memo,
     String? merchant,
     String source = 'manual',
+    List<String> tagIds = const [],
   }) async {
     final rows = await _client.from('transactions').insert({
       'household_id': householdId,
@@ -37,7 +38,14 @@ class TransactionRepository {
       'merchant': merchant,
       'source': source,
     }).select();
-    return LedgerTransaction.fromJson(rows.first);
+    final transaction = LedgerTransaction.fromJson(rows.first);
+    // a brand-new row can't have existing tags, so there's nothing to clear —
+    // skip setTags entirely rather than firing a DELETE that can only ever
+    // affect zero rows
+    if (tagIds.isNotEmpty) {
+      await setTags(transaction.id, tagIds);
+    }
+    return LedgerTransaction.fromJson({...rows.first, 'transaction_tags': tagIds.map((id) => {'tag_id': id}).toList()});
   }
 
   Future<LedgerTransaction> update({
@@ -48,6 +56,7 @@ class TransactionRepository {
     required int amount,
     String? memo,
     String? merchant,
+    List<String> tagIds = const [],
   }) async {
     final rows = await _client
         .from('transactions')
@@ -61,7 +70,18 @@ class TransactionRepository {
         })
         .eq('id', id)
         .select();
-    return LedgerTransaction.fromJson(rows.first);
+    await setTags(id, tagIds);
+    return LedgerTransaction.fromJson({...rows.first, 'transaction_tags': tagIds.map((tagId) => {'tag_id': tagId}).toList()});
+  }
+
+  /// Replaces every tag on [transactionId] with [tagIds] (delete-then-insert
+  /// — simpler and more idempotent than diffing old vs new tag sets).
+  Future<void> setTags(String transactionId, List<String> tagIds) async {
+    await _client.from('transaction_tags').delete().eq('transaction_id', transactionId);
+    if (tagIds.isEmpty) return;
+    await _client.from('transaction_tags').insert(
+          tagIds.map((tagId) => {'transaction_id': transactionId, 'tag_id': tagId}).toList(),
+        );
   }
 
   Future<void> delete(String id) async {

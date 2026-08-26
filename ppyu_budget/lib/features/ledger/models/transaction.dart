@@ -10,6 +10,7 @@ class LedgerTransaction {
     required this.source,
     this.memo,
     this.merchant,
+    this.tagIds = const [],
   });
 
   final String id;
@@ -22,6 +23,7 @@ class LedgerTransaction {
   final String source;
   final String? memo;
   final String? merchant;
+  final List<String> tagIds;
 
   factory LedgerTransaction.fromJson(Map<String, dynamic> json) => LedgerTransaction(
         id: json['id'] as String,
@@ -34,5 +36,8 @@ class LedgerTransaction {
         source: json['source'] as String,
         memo: json['memo'] as String?,
         merchant: json['merchant'] as String?,
+        tagIds: (json['transaction_tags'] as List<dynamic>? ?? [])
+            .map((e) => (e as Map<String, dynamic>)['tag_id'] as String)
+            .toList(),
       );
 }
