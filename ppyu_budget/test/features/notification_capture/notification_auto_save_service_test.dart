@@ -21,6 +21,17 @@ void main() {
   late StreamController<RawNotification> notificationController;
   late NotificationAutoSaveService service;
 
+  // RawNotification.id/timestamp are carried for future dedup work and unread
+  // by the service — this helper supplies placeholders so the tests stay about
+  // package name and text.
+  var nextId = 0;
+  RawNotification notif(String packageName, String text) => RawNotification(
+        packageName: packageName,
+        text: text,
+        id: '${nextId++}',
+        timestamp: DateTime.now(),
+      );
+
   setUp(() async {
     mockServer = await HttpServer.bind('localhost', 0);
     requests = StreamIterator<HttpRequest>(mockServer);
@@ -73,10 +84,7 @@ void main() {
   test('parses a known-source notification, finds-or-creates the account, and saves a transaction',
       () async {
     service.start();
-    notificationController.add(const RawNotification(
-      packageName: 'com.samsung.android.spay',
-      text: '5,000원 승인 스타벅스',
-    ));
+    notificationController.add(notif('com.samsung.android.spay', '5,000원 승인 스타벅스'));
 
     // 1: account lookup — no existing "삼성페이" account
     final (accountLookup, _) = await respondJson([]);
@@ -122,14 +130,8 @@ void main() {
     service.start();
     // Both fired back-to-back, synchronously, before either is processed —
     // this is exactly the interleaving window the pause/resume fix closes.
-    notificationController.add(const RawNotification(
-      packageName: 'com.samsung.android.spay',
-      text: '5,000원 승인 스타벅스',
-    ));
-    notificationController.add(const RawNotification(
-      packageName: 'com.samsung.android.spay',
-      text: '3,000원 승인 이디야',
-    ));
+    notificationController.add(notif('com.samsung.android.spay', '5,000원 승인 스타벅스'));
+    notificationController.add(notif('com.samsung.android.spay', '3,000원 승인 이디야'));
 
     // First notification's full round trip must complete — including the
     // account creation — before the second notification's account lookup is
@@ -196,10 +198,7 @@ void main() {
 
   test('ignores a notification from an unrecognized source', () async {
     service.start();
-    notificationController.add(const RawNotification(
-      packageName: 'com.some.other.app',
-      text: '5,000원 승인 어딘가',
-    ));
+    notificationController.add(notif('com.some.other.app', '5,000원 승인 어딘가'));
 
     // give the stream a moment to process, then confirm no request was made
     await Future<void>.delayed(const Duration(milliseconds: 50));

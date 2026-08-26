@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:ppyu_budget/features/ledger/account_repository.dart';
 import 'package:ppyu_budget/features/ledger/category_repository.dart';
 import 'package:ppyu_budget/features/ledger/transaction_repository.dart';
@@ -31,7 +32,15 @@ class NotificationAutoSaveService {
     // either finishes creating it (no unique constraint on accounts(name)).
     _subscription = _notifications.listen((n) {
       _subscription?.pause();
-      _handle(n).whenComplete(() => _subscription?.resume());
+      // ponytail: debugPrint only — the next phase runs this against real
+      // notifications to find what breaks, and a silent unhandled async error
+      // would hide exactly that. Upgrade to surfacing it in the UI (or a
+      // crash reporter) once the failure modes are known.
+      _handle(n)
+          .catchError((Object e, StackTrace s) {
+            debugPrint('notification capture failed: $e');
+          })
+          .whenComplete(() => _subscription?.resume());
     });
   }
 

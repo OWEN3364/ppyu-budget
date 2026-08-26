@@ -42,9 +42,17 @@ class _NotificationOnboardingScreenState extends State<NotificationOnboardingScr
   }
 
   Future<void> _refresh() async {
-    final granted = await notificationCaptureService.isAccessGranted();
-    if (!mounted) return;
-    setState(() => _granted = granted);
+    try {
+      final granted = await notificationCaptureService.isAccessGranted();
+      if (!mounted) return;
+      setState(() {
+        _granted = granted;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '상태 확인에 실패했어요');
+    }
   }
 
   Future<void> _openSettings() async {
@@ -59,7 +67,10 @@ class _NotificationOnboardingScreenState extends State<NotificationOnboardingScr
     } finally {
       if (mounted) setState(() => _openingSettings = false);
     }
-    await _refresh();
+    // _refresh() clears _error on success — skip it when openAccessSettings()
+    // just failed, so its error message isn't wiped before the user sees it
+    // (the settings screen never opened, so there's nothing new to re-check).
+    if (_error == null) await _refresh();
   }
 
   @override
@@ -72,7 +83,9 @@ class _NotificationOnboardingScreenState extends State<NotificationOnboardingScr
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '카드/은행 결제 알림이 뜰 때 자동으로 거래를 기록해줘요.\n'
+              '카드/은행 결제 알림이 뜰 때 자동으로 거래를 기록해주는 기능을 준비 중이에요.\n'
+              '지금은 알림 접근 권한만 설정하는 단계이고, 실제로 거래가 자동 저장되기 시작하는\n'
+              '건 다음 업데이트에서 연결할 예정이에요.\n'
               'SMS가 아니라 "알림"을 읽는 방식이라 문자 읽기 권한은 필요 없어요.',
             ),
             const SizedBox(height: 16),

@@ -3,10 +3,21 @@ import 'package:notification_listener_service/notification_listener_service.dart
 
 /// A single system notification, reduced to what the parser (Task 3) needs.
 class RawNotification {
-  const RawNotification({required this.packageName, required this.text});
+  const RawNotification({
+    required this.packageName,
+    required this.text,
+    required this.id,
+    required this.timestamp,
+  });
 
   final String packageName;
   final String text;
+
+  /// The platform notification id and post time, carried through unused for
+  /// now so future duplicate-suppression work doesn't have to rework this
+  /// interface. Nothing downstream reads them yet.
+  final String id;
+  final DateTime timestamp;
 }
 
 /// Wraps the `notification_listener_service` package behind a small,
@@ -59,6 +70,13 @@ class NotificationCaptureService {
     final title = event.title.trim();
     final content = event.content.trim();
     final text = [title, content].where((s) => s.isNotEmpty).join(' ');
-    return RawNotification(packageName: event.packageName, text: text);
+    return RawNotification(
+      packageName: event.packageName,
+      text: text,
+      id: event.id.toString(),
+      // `humanTime` is the plugin's own DateTime view of its epoch-millis
+      // `timestamp` field.
+      timestamp: event.humanTime,
+    );
   }
 }
