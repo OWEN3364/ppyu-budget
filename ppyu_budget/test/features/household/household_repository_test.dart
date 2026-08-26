@@ -114,4 +114,39 @@ void main() {
 
     expect(await future, isNull);
   });
+
+  test('setMyNickname calls the set_my_nickname RPC', () async {
+    final future = repo.setMyNickname('household-1', '민수');
+
+    final request = await mockServer.first;
+    expect(request.uri.path, endsWith('/rpc/set_my_nickname'));
+    final bodyStr = await utf8.decodeStream(request);
+    expect(jsonDecode(bodyStr), {'p_household_id': 'household-1', 'p_nickname': '민수'});
+    request.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write('null');
+    await request.response.close();
+
+    await future;
+  });
+
+  test('nicknamesByMemberId maps member id to nickname, defaulting when unset', () async {
+    final future = repo.nicknamesByMemberId('household-1');
+
+    final request = await mockServer.first;
+    expect(request.uri.path, endsWith('/household_members'));
+    expect(request.uri.queryParameters['household_id'], 'eq.household-1');
+    request.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode([
+        {'id': 'member-1', 'nickname': '민수'},
+        {'id': 'member-2', 'nickname': null},
+      ]));
+    await request.response.close();
+
+    final result = await future;
+    expect(result, {'member-1': '민수', 'member-2': '가족 구성원'});
+  });
 }

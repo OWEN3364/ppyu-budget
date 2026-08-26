@@ -44,6 +44,30 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _setNickname(String householdId) async {
+    final controller = TextEditingController();
+    final nickname = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('닉네임 설정'),
+        content: TextField(controller: controller, decoration: const InputDecoration(labelText: '닉네임')),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('취소')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+    if (nickname == null || nickname.isEmpty) return;
+    try {
+      await _repository.setMyNickname(householdId, nickname);
+    } catch (e) {
+      if (mounted) setState(() => _error = '닉네임 저장에 실패했어요');
+    }
+  }
+
   Future<void> _invite() async {
     setState(() => _creating = true);
     try {
@@ -101,6 +125,10 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => TagManagementScreen(householdId: householdId),
               )),
+            ),
+            ListTile(
+              title: const Text('닉네임 설정'),
+              onTap: () => _setNickname(householdId),
             ),
             ListTile(
               title: const Text('이번 달 예산'),
