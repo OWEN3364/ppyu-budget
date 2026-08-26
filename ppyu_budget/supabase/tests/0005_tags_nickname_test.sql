@@ -35,17 +35,30 @@ savepoint sp2;
 do $$
 declare
   v_household_id uuid;
-  v_other_member_id uuid;
+  v_invite_code text;
   v_nickname text;
+  v_other_nickname text;
 begin
   perform set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111"}', true);
   v_household_id := create_household_and_owner();
+  v_invite_code := create_invite_code(v_household_id);
 
+  perform set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+  perform join_household(v_invite_code);
+
+  perform set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111"}', true);
   perform set_my_nickname(v_household_id, '민수');
+
   select nickname into v_nickname from household_members
-    where household_id = v_household_id and user_id = auth.uid();
+    where household_id = v_household_id and user_id = '11111111-1111-1111-1111-111111111111';
   if v_nickname != '민수' then
     raise exception 'TEST FAILED: expected own nickname to be set, got %', v_nickname;
+  end if;
+
+  select nickname into v_other_nickname from household_members
+    where household_id = v_household_id and user_id = '22222222-2222-2222-2222-222222222222';
+  if v_other_nickname is not null then
+    raise exception 'TEST FAILED: set_my_nickname must not touch other members'' rows, but got %', v_other_nickname;
   end if;
 end $$;
 rollback to savepoint sp2;
