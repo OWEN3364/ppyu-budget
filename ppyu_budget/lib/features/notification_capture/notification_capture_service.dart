@@ -18,12 +18,26 @@ class RawNotification {
 class NotificationCaptureService {
   /// Whether the user has already granted notification access in system
   /// settings (Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS access list).
+  ///
+  /// Do not call this (or any other method on this service) while an
+  /// [openAccessSettings] call is still pending. The native plugin shares a
+  /// single pending-result slot across all method calls, so an overlapping
+  /// call here can make the in-flight [openAccessSettings] future hang
+  /// forever instead of completing when the settings result eventually
+  /// arrives.
   Future<bool> isAccessGranted() => nls.NotificationListenerService.isPermissionGranted();
 
   /// Opens the system "notification access" settings screen where the user
   /// grants (or revokes) access for this app. The underlying call returns a
   /// bool once the user returns to the app, but callers of this wrapper
   /// re-check via [isAccessGranted] rather than trust that return value.
+  ///
+  /// Do not call any other method on this service while this Future is
+  /// pending — the native side shares one result callback across all
+  /// methods, and calling another method concurrently can cause this Future
+  /// to hang forever (the eventual real result has nowhere valid to land).
+  /// In particular, do not poll [isAccessGranted] (e.g. from an
+  /// `AppLifecycleState.resumed` handler) until this Future has completed.
   Future<void> openAccessSettings() async {
     await nls.NotificationListenerService.requestPermission();
   }
@@ -31,8 +45,15 @@ class NotificationCaptureService {
   /// Every notification the listener observes system-wide, reduced to
   /// package name + text. Title and content are concatenated because
   /// `NotificationParser.parse` (Task 3) takes a single `text` string.
-  Stream<RawNotification> get notifications =>
-      nls.NotificationListenerService.notificationsStream.map(_toRawNotification);
+  ///
+  /// Filters out two kinds of noise the native stream also emits:
+  /// removal events (the plugin re-emits the same notification with
+  /// `hasRemoved: true` when the user dismisses it, which would otherwise
+  /// double-capture every real notification) and connection/disconnection
+  /// broadcasts (emitted with an empty package name).
+  Stream<RawNotification> get notifications => nls.NotificationListenerService.notificationsStream
+      .where((event) => !event.hasRemoved && event.packageName.isNotEmpty)
+      .map(_toRawNotification);
 
   RawNotification _toRawNotification(ServiceNotificationEvent event) {
     final title = event.title.trim();
