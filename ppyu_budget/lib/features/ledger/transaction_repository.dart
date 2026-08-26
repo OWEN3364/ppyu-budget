@@ -23,6 +23,8 @@ class TransactionRepository {
     required String type,
     required int amount,
     String? memo,
+    String? merchant,
+    String source = 'manual',
   }) async {
     final rows = await _client.from('transactions').insert({
       'household_id': householdId,
@@ -32,7 +34,33 @@ class TransactionRepository {
       'type': type,
       'amount': amount,
       'memo': memo,
+      'merchant': merchant,
+      'source': source,
     }).select();
+    return LedgerTransaction.fromJson(rows.first);
+  }
+
+  Future<LedgerTransaction> update({
+    required String id,
+    required String accountId,
+    required String categoryId,
+    required String type,
+    required int amount,
+    String? memo,
+    String? merchant,
+  }) async {
+    final rows = await _client
+        .from('transactions')
+        .update({
+          'account_id': accountId,
+          'category_id': categoryId,
+          'type': type,
+          'amount': amount,
+          'memo': memo,
+          'merchant': merchant,
+        })
+        .eq('id', id)
+        .select();
     return LedgerTransaction.fromJson(rows.first);
   }
 

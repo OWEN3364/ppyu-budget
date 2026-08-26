@@ -7,7 +7,9 @@ class LedgerTransaction {
     required this.type,
     required this.amount,
     required this.occurredAt,
+    required this.source,
     this.memo,
+    this.merchant,
   });
 
   final String id;
@@ -17,7 +19,9 @@ class LedgerTransaction {
   final String type;
   final int amount;
   final DateTime occurredAt;
+  final String source;
   final String? memo;
+  final String? merchant;
 
   factory LedgerTransaction.fromJson(Map<String, dynamic> json) => LedgerTransaction(
         id: json['id'] as String,
@@ -27,6 +31,8 @@ class LedgerTransaction {
         type: json['type'] as String,
         amount: json['amount'] as int,
         occurredAt: DateTime.parse(json['occurred_at'] as String),
+        source: json['source'] as String,
         memo: json['memo'] as String?,
+        merchant: json['merchant'] as String?,
       );
 }
