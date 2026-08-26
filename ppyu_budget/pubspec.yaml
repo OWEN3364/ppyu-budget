@@ -40,6 +40,7 @@ dependencies:
   mobile_scanner: ^7.4.0
   app_links: ^7.2.1
   flutter_dotenv: ^6.0.1
+  notification_listener_service: ^1.0.0
 
 dev_dependencies:
   flutter_test:

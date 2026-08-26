@@ -42,6 +42,21 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- notification_listener_service: binds our app to Android's
+             NotificationListenerService so it can observe system notifications
+             (bank/card/Samsung Pay alerts) once the user grants notification
+             access in system settings. This is NOT a runtime permission and
+             is unrelated to READ_SMS/RECEIVE_SMS, which this app never uses. -->
+        <service
+            android:label="notifications"
+            android:name="notification.listener.service.NotificationListener"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
