@@ -6,6 +6,7 @@ import 'package:ppyu_budget/features/ledger/account_screen.dart';
 import 'package:ppyu_budget/features/ledger/budget_screen.dart';
 import 'package:ppyu_budget/features/ledger/category_screen.dart';
 import 'package:ppyu_budget/features/ledger/savings_goal_screen.dart';
+import 'package:ppyu_budget/features/ledger/tag_management_screen.dart';
 import 'package:ppyu_budget/features/ledger/transaction_list_screen.dart';
 import 'package:ppyu_budget/features/notification_capture/notification_onboarding_screen.dart';
 
@@ -93,6 +94,12 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('카테고리 관리'),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => CategoryScreen(householdId: householdId),
+              )),
+            ),
+            ListTile(
+              title: const Text('태그 관리'),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => TagManagementScreen(householdId: householdId),
               )),
             ),
             ListTile(
