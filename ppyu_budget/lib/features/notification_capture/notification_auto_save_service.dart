@@ -26,7 +26,13 @@ class NotificationAutoSaveService {
   StreamSubscription<RawNotification>? _subscription;
 
   void start() {
-    _subscription = _notifications.listen(_handle);
+    // ponytail: pause/resume serializes handling so two notifications can't
+    // interleave and both pass the "account doesn't exist" check before
+    // either finishes creating it (no unique constraint on accounts(name)).
+    _subscription = _notifications.listen((n) {
+      _subscription?.pause();
+      _handle(n).whenComplete(() => _subscription?.resume());
+    });
   }
 
   void stop() {

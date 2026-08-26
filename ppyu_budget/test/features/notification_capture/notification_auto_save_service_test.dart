@@ -40,6 +40,15 @@ void main() {
   tearDown(() async {
     service.stop();
     await notificationController.close();
+    // ponytail: a test only awaits the *server* side of the last respondJson
+    // (write+close the response) — the client's in-flight Future for that
+    // same request (e.g. transactionRepository.create()) needs one more
+    // event-loop turn to finish reading it. Disposing the client/server
+    // immediately races that read and intermittently throws "Connection
+    // closed before full header was received". A short grace delay avoids
+    // it; upgrade to explicitly awaiting the handler's completion (e.g. via
+    // a completion callback/Future the test can hook) if this proves flaky.
+    await Future<void>.delayed(const Duration(milliseconds: 20));
     await client.dispose();
     await requests.cancel();
     await mockServer.close(force: true);
@@ -105,6 +114,84 @@ void main() {
     expect(body['amount'], 5000);
     expect(body['source'], 'notification_auto');
     expect(body['merchant'], '스타벅스');
+  });
+
+  test(
+      'serializes handling so two notifications for the same new issuer '
+      'do not race and create a duplicate account', () async {
+    service.start();
+    // Both fired back-to-back, synchronously, before either is processed —
+    // this is exactly the interleaving window the pause/resume fix closes.
+    notificationController.add(const RawNotification(
+      packageName: 'com.samsung.android.spay',
+      text: '5,000원 승인 스타벅스',
+    ));
+    notificationController.add(const RawNotification(
+      packageName: 'com.samsung.android.spay',
+      text: '3,000원 승인 이디야',
+    ));
+
+    // First notification's full round trip must complete — including the
+    // account creation — before the second notification's account lookup is
+    // even sent, if (and only if) handling is serialized.
+    final (lookup1, _) = await respondJson([]);
+    expect(lookup1.uri.path, endsWith('/accounts'));
+
+    final (create1, _) = await respondJson([
+      {'id': 'acc-1', 'name': '삼성페이', 'type': 'card'}
+    ], status: 201);
+    expect(create1.method, 'POST');
+    expect(create1.uri.path, endsWith('/accounts'));
+
+    final (catLookup1, _) = await respondJson([
+      {'id': 'cat-1', 'name': '기타', 'type': 'expense', 'icon': null, 'is_default': true}
+    ]);
+    expect(catLookup1.uri.path, endsWith('/categories'));
+
+    final (txn1, _) = await respondJson([
+      {
+        'id': 't1',
+        'account_id': 'acc-1',
+        'category_id': 'cat-1',
+        'member_id': 'member-1',
+        'type': 'expense',
+        'amount': 5000,
+        'occurred_at': DateTime.now().toUtc().toIso8601String(),
+        'source': 'notification_auto',
+        'memo': null,
+        'merchant': '스타벅스',
+      }
+    ], status: 201);
+    expect(txn1.uri.path, endsWith('/transactions'));
+
+    // Second notification now finds the account the first one just created
+    // — no second POST to /accounts, i.e. no duplicate.
+    final (lookup2, _) = await respondJson([
+      {'id': 'acc-1', 'name': '삼성페이', 'type': 'card'}
+    ]);
+    expect(lookup2.uri.path, endsWith('/accounts'));
+    expect(lookup2.method, 'GET');
+
+    final (catLookup2, _) = await respondJson([
+      {'id': 'cat-1', 'name': '기타', 'type': 'expense', 'icon': null, 'is_default': true}
+    ]);
+    expect(catLookup2.uri.path, endsWith('/categories'));
+
+    final (txn2, _) = await respondJson([
+      {
+        'id': 't2',
+        'account_id': 'acc-1',
+        'category_id': 'cat-1',
+        'member_id': 'member-1',
+        'type': 'expense',
+        'amount': 3000,
+        'occurred_at': DateTime.now().toUtc().toIso8601String(),
+        'source': 'notification_auto',
+        'memo': null,
+        'merchant': '이디야',
+      }
+    ], status: 201);
+    expect(txn2.uri.path, endsWith('/transactions'));
   });
 
   test('ignores a notification from an unrecognized source', () async {
