@@ -26,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _loading = true;
   bool _creating = false;
+  bool _settingNickname = false;
   String? _householdId;
   String? _error;
 
@@ -60,11 +61,19 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+    controller.dispose();
     if (nickname == null || nickname.isEmpty) return;
+    setState(() => _settingNickname = true);
     try {
       await _repository.setMyNickname(householdId, nickname);
     } catch (e) {
-      if (mounted) setState(() => _error = '닉네임 저장에 실패했어요');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('닉네임 저장에 실패했어요')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _settingNickname = false);
     }
   }
 
@@ -128,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               title: const Text('닉네임 설정'),
-              onTap: () => _setNickname(householdId),
+              onTap: _settingNickname ? null : () => _setNickname(householdId),
             ),
             ListTile(
               title: const Text('이번 달 예산'),
