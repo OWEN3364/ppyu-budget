@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/features/ledger/models/transaction.dart';
+import 'package:ppyu_budget/features/ledger/transaction_detail_screen.dart';
 import 'package:ppyu_budget/features/ledger/transaction_form_screen.dart';
 
 class TransactionListScreen extends StatefulWidget {
@@ -35,6 +36,15 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
     }
   }
 
+  String _formatDate(DateTime dt) {
+    final local = dt.toLocal();
+    final mm = local.month.toString().padLeft(2, '0');
+    final dd = local.day.toString().padLeft(2, '0');
+    final hh = local.hour.toString().padLeft(2, '0');
+    final min = local.minute.toString().padLeft(2, '0');
+    return '$mm/$dd $hh:$min';
+  }
+
   @override
   Widget build(BuildContext context) {
     final transactions = _transactions;
@@ -49,23 +59,45 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
         },
         child: const Icon(Icons.add),
       ),
-      body: _error != null
-          ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
-          : transactions == null
-          ? const Center(child: CircularProgressIndicator())
-          : transactions.isEmpty
-              ? const Center(child: Text('아직 거래 내역이 없어요'))
-              : ListView.builder(
-                  itemCount: transactions.length,
-                  itemBuilder: (context, i) {
-                    final t = transactions[i];
-                    final sign = t.type == 'expense' ? '-' : '+';
-                    return ListTile(
-                      title: Text('$sign${t.amount}원'),
-                      subtitle: Text(t.memo ?? ''),
-                    );
-                  },
-                ),
+      body: Column(
+        children: [
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(_error!, style: const TextStyle(color: Colors.red)),
+            ),
+          Expanded(
+            child: transactions == null
+                ? const Center(child: CircularProgressIndicator())
+                : transactions.isEmpty
+                    ? const Center(child: Text('아직 거래 내역이 없어요'))
+                    : ListView.builder(
+                        itemCount: transactions.length,
+                        itemBuilder: (context, i) {
+                          final t = transactions[i];
+                          final sign = t.type == 'expense' ? '-' : '+';
+                          return ListTile(
+                            leading: t.source == 'notification_auto'
+                                ? const Icon(Icons.notifications_active, size: 20)
+                                : null,
+                            title: Text(t.merchant?.isNotEmpty == true ? t.merchant! : (t.memo ?? '(내용 없음)')),
+                            subtitle: Text(_formatDate(t.occurredAt)),
+                            trailing: Text('$sign${t.amount}원'),
+                            onTap: () async {
+                              await Navigator.of(context).push(MaterialPageRoute(
+                                builder: (_) => TransactionDetailScreen(
+                                  householdId: widget.householdId,
+                                  transaction: t,
+                                ),
+                              ));
+                              _load();
+                            },
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
     );
   }
 }
