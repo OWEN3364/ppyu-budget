@@ -1240,6 +1240,13 @@ class NotificationOnboardingScreen extends StatefulWidget {
 class _NotificationOnboardingScreenState extends State<NotificationOnboardingScreen>
     with WidgetsBindingObserver {
   bool? _granted;
+  // Task 6's NotificationCaptureService documents that openAccessSettings()
+  // and isAccessGranted() must never overlap in time (the native side shares
+  // one result callback across all plugin methods, so calling isAccessGranted()
+  // while openAccessSettings() is still pending can make openAccessSettings()
+  // hang forever). This guard stops the lifecycle-resume auto-refresh below
+  // from racing a still-in-flight openAccessSettings() call.
+  bool _openingSettings = false;
 
   @override
   void initState() {
@@ -1257,13 +1264,20 @@ class _NotificationOnboardingScreenState extends State<NotificationOnboardingScr
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // catches the user coming back from the system settings screen
-    if (state == AppLifecycleState.resumed) _refresh();
+    if (state == AppLifecycleState.resumed && !_openingSettings) _refresh();
   }
 
   Future<void> _refresh() async {
     final granted = await notificationCaptureService.isAccessGranted();
     if (!mounted) return;
     setState(() => _granted = granted);
+  }
+
+  Future<void> _openSettings() async {
+    setState(() => _openingSettings = true);
+    await notificationCaptureService.openAccessSettings();
+    _openingSettings = false;
+    await _refresh();
   }
 
   @override
@@ -1290,7 +1304,7 @@ class _NotificationOnboardingScreenState extends State<NotificationOnboardingScr
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: notificationCaptureService.openAccessSettings,
+              onPressed: _openingSettings ? null : _openSettings,
               child: const Text('알림 접근 설정 열기'),
             ),
             const SizedBox(height: 24),
