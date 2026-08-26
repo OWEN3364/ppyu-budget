@@ -48,6 +48,12 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
       setState(() {
         _accounts = accounts;
         _categories = categories;
+        _accountId = accounts.any((a) => a.id == _accountId)
+            ? _accountId
+            : (accounts.isNotEmpty ? accounts.first.id : null);
+        _categoryId = categories.any((c) => c.id == _categoryId)
+            ? _categoryId
+            : (categories.isNotEmpty ? categories.first.id : null);
         _error = null;
       });
     } catch (e) {
@@ -138,7 +144,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
             ),
             if (accounts.isNotEmpty)
               DropdownButton<String>(
-                value: accounts.any((a) => a.id == _accountId) ? _accountId : accounts.first.id,
+                value: _accountId,
                 items: accounts
                     .map((a) => DropdownMenuItem(value: a.id, child: Text(a.name)))
                     .toList(),
@@ -146,7 +152,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               ),
             if (categories.isNotEmpty)
               DropdownButton<String>(
-                value: categories.any((c) => c.id == _categoryId) ? _categoryId : categories.first.id,
+                value: _categoryId,
                 items: categories
                     .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
                     .toList(),
