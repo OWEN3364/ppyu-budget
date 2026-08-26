@@ -60,13 +60,18 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   }
 
   Future<void> _delete(String tagId) async {
-    setState(() => _error = null);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       await tagRepository.delete(tagId);
       await _load();
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = '태그 삭제에 실패했어요');
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -93,7 +98,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                       title: Text(tags[i].name),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete),
-                        onPressed: () => _delete(tags[i].id),
+                        onPressed: _saving ? null : () => _delete(tags[i].id),
                       ),
                     ),
                   ),
