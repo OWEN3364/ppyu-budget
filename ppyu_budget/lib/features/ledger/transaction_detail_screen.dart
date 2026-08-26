@@ -41,10 +41,14 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   }
 
   Future<void> _loadOptions() async {
+    // Guards against an out-of-order response: switching type twice quickly
+    // fires two loads, and the slower (older) one must not overwrite the
+    // newer one's categories.
+    final requestedType = _type;
     try {
       final accounts = await accountRepository.list(widget.householdId);
       final categories = await categoryRepository.list(widget.householdId, type: _type);
-      if (!mounted) return;
+      if (!mounted || requestedType != _type) return;
       setState(() {
         _accounts = accounts;
         _categories = categories;
@@ -57,7 +61,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
         _error = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestedType != _type) return;
       setState(() => _error = '옵션을 불러오지 못했어요');
     }
   }
@@ -93,6 +97,24 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
     }
   }
 
+  Future<void> _delete() async {
+    // reuses _saving as the single busy flag so a double-tap (or a
+    // save-then-delete) can't fire two writes
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await transactionRepository.delete(widget.transaction.id);
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '거래 삭제에 실패했어요');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   void dispose() {
     _amountController.dispose();
@@ -114,7 +136,15 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('거래 상세')),
+      appBar: AppBar(
+        title: const Text('거래 상세'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete),
+            onPressed: _saving ? null : _delete,
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

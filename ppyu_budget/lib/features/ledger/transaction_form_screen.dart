@@ -35,10 +35,14 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   }
 
   Future<void> _loadOptions() async {
+    // Guards against an out-of-order response: switching type twice quickly
+    // fires two loads, and the slower (older) one must not overwrite the
+    // newer one's categories.
+    final requestedType = _type;
     try {
       final accounts = await accountRepository.list(widget.householdId);
       final categories = await categoryRepository.list(widget.householdId, type: _type);
-      if (!mounted) return;
+      if (!mounted || requestedType != _type) return;
       setState(() {
         _accounts = accounts;
         _categories = categories;
@@ -47,7 +51,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         _error = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestedType != _type) return;
       setState(() => _error = '계좌/카테고리를 불러오지 못했어요');
     }
   }
