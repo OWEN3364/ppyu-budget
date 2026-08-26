@@ -7,6 +7,7 @@ import 'package:ppyu_budget/features/ledger/budget_screen.dart';
 import 'package:ppyu_budget/features/ledger/category_screen.dart';
 import 'package:ppyu_budget/features/ledger/savings_goal_screen.dart';
 import 'package:ppyu_budget/features/ledger/transaction_list_screen.dart';
+import 'package:ppyu_budget/features/notification_capture/notification_onboarding_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, HouseholdRepository? repository})
@@ -104,6 +105,12 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('저축 목표'),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => SavingsGoalScreen(householdId: householdId),
+              )),
+            ),
+            ListTile(
+              title: const Text('결제 알림 자동인식 설정'),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const NotificationOnboardingScreen(),
               )),
             ),
           ],
