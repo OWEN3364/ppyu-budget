@@ -20,6 +20,7 @@ class _NotificationOnboardingScreenState extends State<NotificationOnboardingScr
   // hang forever). This guard stops the lifecycle-resume auto-refresh below
   // from racing a still-in-flight openAccessSettings() call.
   bool _openingSettings = false;
+  String? _error;
 
   @override
   void initState() {
@@ -47,9 +48,17 @@ class _NotificationOnboardingScreenState extends State<NotificationOnboardingScr
   }
 
   Future<void> _openSettings() async {
-    setState(() => _openingSettings = true);
-    await notificationCaptureService.openAccessSettings();
-    _openingSettings = false;
+    setState(() {
+      _openingSettings = true;
+      _error = null;
+    });
+    try {
+      await notificationCaptureService.openAccessSettings();
+    } catch (e) {
+      if (mounted) setState(() => _error = '설정 화면을 여는 데 실패했어요');
+    } finally {
+      if (mounted) setState(() => _openingSettings = false);
+    }
     await _refresh();
   }
 
@@ -80,6 +89,11 @@ class _NotificationOnboardingScreenState extends State<NotificationOnboardingScr
               onPressed: _openingSettings ? null : _openSettings,
               child: const Text('알림 접근 설정 열기'),
             ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(_error!, style: const TextStyle(color: Colors.red)),
+              ),
             const SizedBox(height: 24),
             const Text(
               '⚠️ 꼭 확인해주세요',
