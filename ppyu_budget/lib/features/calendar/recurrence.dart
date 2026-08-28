@@ -41,6 +41,12 @@ List<Occurrence> expandOccurrences(CalendarEvent event, DateTime rangeStart, Dat
 
   if (rule.startsWith('WEEKLY:')) {
     final days = rule.substring(7).split(',').map((c) => _weekdayCodes[c]).whereType<int>().toSet();
+    // An empty day set ('WEEKLY:' or only invalid codes) is a malformed rule —
+    // fall back to a single occurrence like every other malformed case below,
+    // instead of silently dropping the event.
+    if (days.isEmpty) {
+      return inRange(event.startAt) ? [occ(event.startAt)] : [];
+    }
     var cursor = event.startAt;
     while (!cursor.isAfter(rangeEnd)) {
       if (days.contains(cursor.weekday) && inRange(cursor)) results.add(occ(cursor));

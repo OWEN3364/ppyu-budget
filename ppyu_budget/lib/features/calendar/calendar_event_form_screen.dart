@@ -87,6 +87,12 @@ class _CalendarEventFormScreenState extends State<CalendarEventFormScreen> {
       setState(() => _error = '종료 시각은 시작 시각보다 뒤여야 해요');
       return;
     }
+    // Without this, _recurrenceRule silently returns null and "매주" is saved
+    // as "no recurrence" with no feedback.
+    if (_frequency == _Frequency.weekly && _selectedWeekdays.isEmpty) {
+      setState(() => _error = '반복할 요일을 하나 이상 선택해주세요');
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
