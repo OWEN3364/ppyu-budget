@@ -38,10 +38,15 @@ void main() {
   });
 
   test('MONTHLY skips a month that does not have the day-of-month', () {
-    // Jan 31 recurrence: Feb has no 31st, so Feb must be skipped entirely
+    // Jan 31 recurrence over Feb-Apr range:
+    // - Feb: candidate rolls to Mar 3 (skip-guard: month != 2, skip)
+    // - Mar: candidate is Mar 31 (skip-guard: month == 3, add occurrence)
+    // - Apr: candidate rolls to May 1 (break on isAfter rangeEnd)
+    // Expected: exactly 1 occurrence on Mar 31 (Feb skipped by guard, Apr has no 31st)
     final event = _event(start: DateTime(2026, 1, 31, 10), end: DateTime(2026, 1, 31, 11), rule: 'MONTHLY');
-    final result = expandOccurrences(event, DateTime(2026, 2, 1), DateTime(2026, 2, 28, 23, 59, 59));
-    expect(result, isEmpty);
+    final result = expandOccurrences(event, DateTime(2026, 2, 1), DateTime(2026, 4, 30, 23, 59, 59));
+    expect(result, hasLength(1));
+    expect(result.first.start, DateTime(2026, 3, 31, 10));
   });
 
   test('MONTHLY produces an occurrence for a month that does have the day', () {
