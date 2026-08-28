@@ -50,12 +50,14 @@ void main() {
     expect(result.first.recurrenceRule, isNull);
   });
 
-  test('create posts a new event with recurrence rule', () async {
+  test('create posts a new event with recurrence rule and converts to UTC', () async {
     final future = repo.create(
       householdId: 'household-1',
       title: '운동',
-      startAt: DateTime.utc(2026, 9, 1, 7),
-      endAt: DateTime.utc(2026, 9, 1, 8),
+      // Input: 2026-09-01 at 16:00 in +09:00 timezone
+      startAt: DateTime.parse('2026-09-01T16:00:00+09:00'),
+      // Input: 2026-09-01 at 17:00 in +09:00 timezone
+      endAt: DateTime.parse('2026-09-01T17:00:00+09:00'),
       allDay: false,
       createdBy: 'member-1',
       recurrenceRule: 'WEEKLY:MO,WE,FR',
@@ -63,6 +65,7 @@ void main() {
 
     final request = await mockServer.first;
     final bodyStr = await utf8.decodeStream(request);
+    // Expected: 16:00+09:00 = 07:00 UTC, 17:00+09:00 = 08:00 UTC
     expect(jsonDecode(bodyStr), {
       'household_id': 'household-1',
       'title': '운동',
@@ -90,6 +93,48 @@ void main() {
 
     final result = await future;
     expect(result.recurrenceRule, 'WEEKLY:MO,WE,FR');
+  });
+
+  test('update modifies an event and converts to UTC', () async {
+    final future = repo.update(
+      id: 'evt-1',
+      title: '병원 방문',
+      // Input: 2026-09-02 at 18:00 in +09:00 timezone
+      startAt: DateTime.parse('2026-09-02T18:00:00+09:00'),
+      // Input: 2026-09-02 at 19:00 in +09:00 timezone
+      endAt: DateTime.parse('2026-09-02T19:00:00+09:00'),
+      allDay: false,
+    );
+
+    final request = await mockServer.first;
+    expect(request.method, 'PATCH');
+    final bodyStr = await utf8.decodeStream(request);
+    // Expected: 18:00+09:00 = 09:00 UTC, 19:00+09:00 = 10:00 UTC
+    expect(jsonDecode(bodyStr), {
+      'title': '병원 방문',
+      'start_at': '2026-09-02T09:00:00.000Z',
+      'end_at': '2026-09-02T10:00:00.000Z',
+      'all_day': false,
+      'recurrence_rule': null,
+    });
+    request.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode([
+        {
+          'id': 'evt-1',
+          'title': '병원 방문',
+          'start_at': '2026-09-02T09:00:00.000Z',
+          'end_at': '2026-09-02T10:00:00.000Z',
+          'all_day': false,
+          'created_by': 'member-1',
+          'recurrence_rule': null,
+        },
+      ]));
+    await request.response.close();
+
+    final result = await future;
+    expect(result.title, '병원 방문');
   });
 
   test('delete removes an event by id', () async {
