@@ -4,6 +4,8 @@ import 'package:ppyu_budget/features/calendar/calendar_event_form_screen.dart' s
 import 'package:ppyu_budget/features/calendar/models/calendar_event.dart';
 import 'package:ppyu_budget/features/calendar/recurrence.dart';
 
+typedef EventOccurrence = (CalendarEvent, Occurrence);
+
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key, required this.householdId});
 
@@ -41,7 +43,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   // 보이는 달 앞뒤로 1개월씩 여유를 두고 발생을 계산 — 달력이 표시하는 grid가
   // 이전/다음 달의 며칠을 살짝 걸치기 때문 (다다음 주까지 넘어가는 경우 등).
-  List<Occurrence> _occurrencesFor(DateTime day) {
+  //
+  // 발생을 만든 원본 이벤트를 (event, occurrence) 쌍으로 함께 들고 다닌다 —
+  // 나중에 start 시각만으로 원본을 재추정하면 같은 시각에 겹치는 두 이벤트를
+  // 구별하지 못한다.
+  List<EventOccurrence> _occurrencesFor(DateTime day) {
     final events = _events;
     if (events == null) return [];
     final rangeStart = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
@@ -49,8 +55,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final dayStart = DateTime(day.year, day.month, day.day);
     final dayEnd = DateTime(day.year, day.month, day.day, 23, 59, 59);
     return events
-        .expand((e) => expandOccurrences(e, rangeStart, rangeEnd))
-        .where((o) => !o.start.isAfter(dayEnd) && !o.end.isBefore(dayStart))
+        .expand((e) => expandOccurrences(e, rangeStart, rangeEnd).map((o) => (e, o)))
+        .where((pair) => !pair.$2.start.isAfter(dayEnd) && !pair.$2.end.isBefore(dayStart))
         .toList();
   }
 
@@ -77,7 +83,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           if (_events == null)
             const Expanded(child: Center(child: CircularProgressIndicator()))
           else ...[
-            TableCalendar<Occurrence>(
+            TableCalendar<EventOccurrence>(
               focusedDay: _focusedDay,
               firstDay: DateTime(2000),
               lastDay: DateTime(2100),
@@ -96,22 +102,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ? const Center(child: Text('날짜를 선택하면 일정이 보여요'))
                   : Builder(builder: (context) {
                       final occurrences = _occurrencesFor(selectedDay)
-                        ..sort((a, b) => a.start.compareTo(b.start));
+                        ..sort((a, b) => a.$2.start.compareTo(b.$2.start));
                       if (occurrences.isEmpty) {
                         return const Center(child: Text('이 날은 일정이 없어요'));
                       }
                       return ListView.builder(
                         itemCount: occurrences.length,
                         itemBuilder: (context, i) {
-                          final occ = occurrences[i];
-                          // 반복 일정의 어떤 발생을 탭했는지와 무관하게, 그
-                          // 발생을 만들어낸 원본 이벤트를 찾아 상세 화면에
-                          // 넘긴다 — 상세 화면은 발생이 아니라 규칙 자체를
-                          // 다룬다.
-                          final event = _events!.firstWhere(
-                            (e) => expandOccurrences(e, occ.start, occ.start).isNotEmpty ||
-                                (e.startAt == occ.start),
-                          );
+                          final (event, occ) = occurrences[i];
                           return ListTile(
                             title: Text(event.title),
                             subtitle: Text(event.allDay ? '종일' : '${occ.start.hour.toString().padLeft(2, '0')}:${occ.start.minute.toString().padLeft(2, '0')}'),
