@@ -5,6 +5,12 @@ import 'package:ppyu_budget/features/calendar/recurrence.dart';
 CalendarEvent _event({required DateTime start, required DateTime end, String? rule}) =>
     CalendarEvent(id: 'e', title: 't', startAt: start, endAt: end, allDay: false, createdBy: 'm', recurrenceRule: rule);
 
+// The test runner's timezone is whatever the machine is set to, so the local
+// weekday of a fixed instant is not knowable ahead of time — derive the rule's
+// day code from the converted value rather than hardcoding 'MO'.
+const _weekdayCodes = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+String _weekdayCode(int weekday) => _weekdayCodes[weekday - 1];
+
 void main() {
   final rangeStart = DateTime(2026, 9, 1);
   final rangeEnd = DateTime(2026, 9, 30, 23, 59, 59);
@@ -69,6 +75,56 @@ void main() {
     for (final o in result) {
       expect(o.end.difference(o.start), const Duration(hours: 2, minutes: 30));
     }
+  });
+
+  test('WEEKLY matches the local weekday, not the UTC weekday (regression for the fromJson .toLocal() fix)', () {
+    // Build the event the way production does — straight out of a PostgREST
+    // UTC-labeled payload via fromJson — rather than from a bare local
+    // DateTime literal, so this actually exercises what expandOccurrences
+    // receives at runtime. 2026-09-07 06:00 KST (Monday) is 2026-09-06 21:00
+    // UTC (Sunday); without fromJson's .toLocal() the WEEKLY branch matches
+    // cursor.weekday against the UTC weekday and the event recurs a day early.
+    final event = CalendarEvent.fromJson({
+      'id': 'e',
+      'title': 't',
+      'start_at': '2026-09-06T21:00:00.000Z',
+      'end_at': '2026-09-06T22:00:00.000Z',
+      'all_day': false,
+      'created_by': 'm',
+      'recurrence_rule': null,
+    });
+    // Timezone-independent anchor: this alone fails if .toLocal() is dropped.
+    expect(event.startAt.isUtc, isFalse);
+
+    final expected = DateTime.parse('2026-09-06T21:00:00.000Z').toLocal();
+    final recurring = _event(
+      start: event.startAt,
+      end: event.endAt,
+      rule: 'WEEKLY:${_weekdayCode(expected.weekday)}',
+    );
+    final result = expandOccurrences(
+      recurring,
+      DateTime(expected.year, expected.month, 1),
+      DateTime(expected.year, expected.month + 1, 0, 23, 59, 59),
+    );
+    expect(result, isNotEmpty);
+    for (final o in result) {
+      expect(o.start.weekday, expected.weekday);
+    }
+  });
+
+  test('WEEKLY with an empty day list falls back to a single occurrence at start_at', () {
+    final event = _event(start: DateTime(2026, 9, 10, 9), end: DateTime(2026, 9, 10, 10), rule: 'WEEKLY:');
+    final result = expandOccurrences(event, rangeStart, rangeEnd);
+    expect(result, hasLength(1));
+    expect(result.first.start, DateTime(2026, 9, 10, 9));
+  });
+
+  test('WEEKLY with only invalid day codes falls back to a single occurrence at start_at', () {
+    final event = _event(start: DateTime(2026, 9, 10, 9), end: DateTime(2026, 9, 10, 10), rule: 'WEEKLY:XX');
+    final result = expandOccurrences(event, rangeStart, rangeEnd);
+    expect(result, hasLength(1));
+    expect(result.first.start, DateTime(2026, 9, 10, 9));
   });
 
   test('a malformed rule falls back to a single occurrence at start_at', () {

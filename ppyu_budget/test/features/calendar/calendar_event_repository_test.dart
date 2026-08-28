@@ -48,6 +48,12 @@ void main() {
     expect(result, hasLength(1));
     expect(result.first.title, '병원 예약');
     expect(result.first.recurrenceRule, isNull);
+    // PostgREST hands back UTC-labeled timestamps; fromJson must convert them
+    // to local time or every downstream consumer reads the wrong wall clock.
+    expect(result.first.startAt.isUtc, isFalse);
+    expect(result.first.endAt.isUtc, isFalse);
+    expect(result.first.startAt, DateTime.parse('2026-09-01T00:00:00.000Z').toLocal());
+    expect(result.first.endAt, DateTime.parse('2026-09-01T01:00:00.000Z').toLocal());
   });
 
   test('create posts a new event with recurrence rule and converts to UTC', () async {
