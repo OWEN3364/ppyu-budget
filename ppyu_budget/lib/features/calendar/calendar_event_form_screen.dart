@@ -166,12 +166,13 @@ class _CalendarEventFormScreenState extends State<CalendarEventFormScreen> {
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
-    if (picked != null) setState(() => _date = picked);
+    if (picked == null || !mounted) return;
+    setState(() => _date = picked);
   }
 
   Future<void> _pickTime(bool isStart) async {
     final picked = await showTimePicker(context: context, initialTime: isStart ? _startTime : _endTime);
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     setState(() {
       if (isStart) {
         _startTime = picked;
