@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ppyu_budget/features/calendar/calendar_screen.dart';
 import 'package:ppyu_budget/features/household/household_repository.dart';
 import 'package:ppyu_budget/features/household/invite_screen.dart';
 import 'package:ppyu_budget/features/household/join_screen.dart';
@@ -164,6 +165,12 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('통계'),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => StatsScreen(householdId: householdId),
+              )),
+            ),
+            ListTile(
+              title: const Text('캘린더'),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => CalendarScreen(householdId: householdId),
               )),
             ),
             ListTile(
