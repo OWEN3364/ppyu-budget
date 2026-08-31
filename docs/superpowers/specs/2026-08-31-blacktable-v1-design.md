@@ -83,7 +83,7 @@ create table seats (
   room_id uuid not null references rooms(id) on delete cascade,
   user_id uuid not null references auth.users(id),
   is_guest boolean not null default true,         -- 익명 세션이면 true
-  seat_index int not null,                        -- 0..7 (방 정원 8석)
+  seat_index int not null,                        -- 0..29 (방 정원 30석)
   nickname text not null,                         -- 스냅샷(게스트 이름 표시용)
   chips int not null default 0,
   connected boolean not null default true,
@@ -143,13 +143,17 @@ where exists (                                     -- 그 방의 참가자
 
 ### 4.2 프리셋
 
-덱 구성·기본 분배 장수는 정적 데이터다. Flutter 클라이언트 상수로 두고 DB에는 `preset_key`만 저장한다.
+덱 구성·기본 분배 장수·게임 인원 범위는 정적 데이터다. Flutter 클라이언트 상수로 두고 DB에는 `preset_key`만 저장한다.
 
-| preset_key | 덱 구성 | 기본 분배 | 자동 생성 무더기 |
-|---|---|---|---|
-| `trump` | 52장 + 조커 2장 | 원카드 7장 / 도둑잡기 균등 / 방장 수정 가능 | `deck`(중앙), `discard` |
-| `hwatu` | 화투 48장 | 방장 지정 | `deck`, `discard` |
-| `tokens` | 카드 없음 | — | 주사위, 범용 토큰 무더기 |
+| preset_key | 덱 구성 | 게임 인원 | 기본 분배 | 자동 생성 무더기 |
+|---|---|---|---|---|
+| `trump` | 52장 + 조커 2장 | 2~10 | 원카드 7장 / 도둑잡기 균등 / 방장 수정 가능 | `deck`(중앙), `discard` |
+| `hwatu` | 화투 48장 | 2~4 | 방장 지정 | `deck`, `discard` |
+| `tokens` | 카드 없음 | 1~30 | — | 주사위, 범용 토큰 무더기 |
+
+- **방 정원은 30명 고정.** 프리셋의 "게임 인원"은 한 판에 실제로 참여(=`deal` 대상)할 수 있는 인원 범위다.
+- `deal` 시 카드를 받는 좌석 수가 프리셋 범위를 벗어나면 거부. 범위를 넘는 나머지 인원은 관전자로 방에 머문다(좌석은 있으나 그 판에는 미참여).
+- 인원 범위는 프리셋 상수일 뿐이므로 게임 추가 시 값만 정의하면 된다.
 
 ## 5. RPC 함수 (v1 전체)
 
@@ -158,13 +162,13 @@ where exists (                                     -- 그 방의 참가자
 | 함수 | 권한 | 동작 |
 |---|---|---|
 | `create_room(preset_key, currency_label?, starting_chips?)` | 로그인/게스트 | 방 생성 + 6자 코드 발급 + 방장 좌석 생성. 반환: room, code, table URL |
-| `join_room(code, nickname)` | 로그인/게스트 | `auth.uid()`의 좌석을 생성(정원 8석). **로그인 사용자만** 기존 좌석 재바인딩(재접속). 게스트는 항상 새 좌석 |
+| `join_room(code, nickname)` | 로그인/게스트 | `auth.uid()`의 좌석을 생성(방 정원 30석). **로그인 사용자만** 기존 좌석 재바인딩(재접속). 게스트는 항상 새 좌석 |
 | `join_as_table(code)` | 익명 | `table_viewers` 행 생성(좌석 아님). 반환: 공용 방 상태. 좌석 수에 포함 안 됨 |
 | `leave_room(room_id)` | 본인 | 좌석 처리(§6.3 참조) |
 | `close_room(room_id)` | 방장 | `rooms` 행 삭제 → CASCADE로 seats/piles/cards 정리 |
 | `transfer_host(room_id, to_seat_id)` | 방장 | `rooms.host_id` 교체 |
 | `claim_host(room_id)` | 참가자 | 현재 방장이 `connected=false`로 2분 경과 시에만 성공 |
-| `deal(room_id, from_pile_id, counts)` | 방장 | 덱에서 각 손패로 카드 이동. `counts`는 좌석별 장수(맵) |
+| `deal(room_id, from_pile_id, counts)` | 방장 | 덱에서 각 손패로 카드 이동. `counts`는 좌석별 장수(맵). 대상 좌석 수가 프리셋 인원 범위 밖이면 거부 |
 | `draw(room_id, from_pile_id)` | 참가자 | 지정 무더기 맨 위(최대 sort_order) 1장 → 내 손패 |
 | `move_cards(card_ids, to_pile_id, at_sort_order?, face_up?)` | 참가자 | 카드들을 다른 무더기로. **출발 무더기가 내 손패 또는 테이블(자유더미/discard) 인 카드만.** 남의 손패·엎힌 `deck`은 불가 |
 | `shuffle_pile(pile_id)` | 방장(모든 무더기) / 참가자(자기 손패·테이블 자유더미) | 서버가 `sort_order` 무작위 재배정 |
@@ -225,7 +229,7 @@ where id = any($card_ids)
 
 ### 6.6 기타 입력 오류
 
-- 없는 코드 / 정원 초과(8석) / `lobby` 아닌데 `deal` / 남의 좌석 `set_chips` → RPC 예외, 클라이언트 토스트.
+- 없는 코드 / 방 정원 초과(30석) / 프리셋 인원 범위 밖 `deal` / `lobby` 아닌데 `deal` / 남의 좌석 `set_chips` → RPC 예외, 클라이언트 토스트.
 - Realtime 통지 유실 → 다음 이벤트나 on-focus 리페치까지 잠시 stale. 허용.
 
 ### 6.7 치팅 경계 (천장 명시)
@@ -241,6 +245,7 @@ RLS + `cards_view`/`pile_projection` 마스킹 + RPC의 출발 무더기 검증�
   - 상단: 테이블 축소도(공용 무더기, 상대별 카드 뒷면 수·칩).
   - 내 칩 표시 + (칩 사용 방이면) 칩 이동 UI.
   - 방장이면: 세팅·`deal`·`transfer_host`·`close_room` 메뉴.
+  - 프리셋 인원 범위를 넘어 `deal` 대상에서 빠진 좌석은 "관전 중" 표시(손패 없음, 테이블·칩은 봄).
 - **테이블 뷰(TV):** 로그인 없이 코드로 접속. 공용 무더기·좌석별 뒷면 수·칩만 크게. 조작 없음(또는 방장 폰에서 원격 제어만). presence로 "OO 연결 끊김" 배지.
 - **프로필(로그인):** 닉네임, 카드 스킨(2~3종), 아바타 스킨(2~3종).
 
@@ -252,7 +257,7 @@ RLS + `cards_view`/`pile_projection` 마스킹 + RPC의 출발 무더기 검증�
 2. `cards_view`가 남의 엎힌 카드의 `card_code`를 `null`로 마스킹한다.
 3. `pile_projection`이 `spread=false` 무더기의 장수를 비소유자에게 노출하지 않는다.
 4. 동시 `move_cards` 두 건 → 두 번째가 `conflict`.
-5. `deal`은 방장만. `transfer_host`는 방장만. `claim_host`는 방장 `connected=false` 2분 경과 시에만.
+5. `deal`은 방장만이고 대상 좌석 수가 프리셋 인원 범위(trump 2~10 등) 밖이면 거부. `transfer_host`는 방장만. `claim_host`는 방장 `connected=false` 2분 경과 시에만.
 6. `set_chips` 결과가 음수면 거부. 참가자는 자기 좌석만.
 7. 게스트 `leave_room` → 좌석 삭제 + 손패가 `named` 무더기로 이관.
 
