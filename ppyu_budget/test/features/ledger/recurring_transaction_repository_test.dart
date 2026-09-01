@@ -59,7 +59,7 @@ void main() {
       type: 'expense',
       amount: 50000,
       intervalRule: 'MONTHLY',
-      nextRunAt: DateTime.parse('2026-09-06T06:00:00+09:00'),
+      nextRunAt: DateTime.parse('2026-09-05T21:00:00.000Z').toLocal(),
     );
 
     final request = await mockServer.first;
@@ -88,7 +88,7 @@ void main() {
   });
 
   test('advanceNextRunAt only sends next_run_at, converted to UTC', () async {
-    final future = repo.advanceNextRunAt('rt-1', DateTime.parse('2026-10-06T06:00:00+09:00'));
+    final future = repo.advanceNextRunAt('rt-1', DateTime.parse('2026-10-05T21:00:00.000Z').toLocal());
 
     final request = await mockServer.first;
     expect(request.method, 'PATCH');
@@ -96,6 +96,45 @@ void main() {
     final bodyStr = await utf8.decodeStream(request);
     expect(jsonDecode(bodyStr), {'next_run_at': '2026-10-05T21:00:00.000Z'});
     request.response.statusCode = HttpStatus.noContent;
+    await request.response.close();
+
+    await future;
+  });
+
+  test('update sends next_run_at converted to UTC', () async {
+    final future = repo.update(
+      id: 'rt-1',
+      accountId: 'account-2',
+      categoryId: 'category-2',
+      type: 'income',
+      amount: 100000,
+      intervalRule: 'WEEKLY',
+      nextRunAt: DateTime.parse('2026-11-05T21:00:00.000Z').toLocal(),
+      memo: 'Updated memo',
+    );
+
+    final request = await mockServer.first;
+    expect(request.method, 'PATCH');
+    expect(request.uri.queryParameters['id'], 'eq.rt-1');
+    final bodyStr = await utf8.decodeStream(request);
+    final body = jsonDecode(bodyStr) as Map<String, dynamic>;
+    expect(body['next_run_at'], '2026-11-05T21:00:00.000Z');
+    request.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode([
+        {
+          'id': 'rt-1',
+          'account_id': 'account-2',
+          'category_id': 'category-2',
+          'created_by': 'member-1',
+          'type': 'income',
+          'amount': 100000,
+          'interval_rule': 'WEEKLY',
+          'next_run_at': '2026-11-05T21:00:00.000Z',
+          'memo': 'Updated memo',
+        },
+      ]));
     await request.response.close();
 
     await future;
