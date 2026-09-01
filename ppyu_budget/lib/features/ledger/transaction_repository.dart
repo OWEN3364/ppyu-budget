@@ -26,6 +26,7 @@ class TransactionRepository {
     String? merchant,
     String source = 'manual',
     List<String> tagIds = const [],
+    DateTime? occurredAt,
   }) async {
     final rows = await _client.from('transactions').insert({
       'household_id': householdId,
@@ -37,6 +38,7 @@ class TransactionRepository {
       'memo': memo,
       'merchant': merchant,
       'source': source,
+      if (occurredAt != null) 'occurred_at': occurredAt.toUtc().toIso8601String(),
     }).select();
     final transaction = LedgerTransaction.fromJson(rows.first);
     // a brand-new row can't have existing tags, so there's nothing to clear —

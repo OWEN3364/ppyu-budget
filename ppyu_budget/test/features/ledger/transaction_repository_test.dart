@@ -281,4 +281,43 @@ void main() {
     expect(result.id, 'txn-1');
     expect(result.tagIds, ['tag-1', 'tag-2']);
   });
+
+  test('create sends occurred_at converted to UTC when provided', () async {
+    final future = repo.create(
+      householdId: 'household-1',
+      accountId: 'account-1',
+      categoryId: 'category-1',
+      memberId: 'member-1',
+      type: 'expense',
+      amount: 50000,
+      source: 'recurring_auto',
+      occurredAt: DateTime.parse('2026-09-06T06:00:00+09:00'),
+    );
+
+    final request = await mockServer.first;
+    final bodyStr = await utf8.decodeStream(request);
+    final body = jsonDecode(bodyStr) as Map<String, dynamic>;
+    expect(body['occurred_at'], '2026-09-05T21:00:00.000Z');
+    expect(body['source'], 'recurring_auto');
+    request.response
+      ..statusCode = HttpStatus.created
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode([
+        {
+          'id': 'txn-x',
+          'account_id': 'account-1',
+          'category_id': 'category-1',
+          'member_id': 'member-1',
+          'type': 'expense',
+          'amount': 50000,
+          'occurred_at': '2026-09-05T21:00:00.000Z',
+          'source': 'recurring_auto',
+          'memo': null,
+          'merchant': null,
+        },
+      ]));
+    await request.response.close();
+
+    await future;
+  });
 }
