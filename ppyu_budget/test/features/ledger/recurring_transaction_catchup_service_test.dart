@@ -226,8 +226,8 @@ void main() {
   });
 
   test('stops a template early when a concurrent session already advanced next_run_at (CAS failure)', () async {
-    // A DAILY template overdue 3 days (2026-08-01 through 2026-08-03, checked
-    // as of 2026-08-05) — but the mock PATCH handler simulates another
+    // A DAILY template overdue 5 occurrences (2026-08-01 through 2026-08-05,
+    // checked as of 2026-08-05) — but the mock PATCH handler simulates another
     // session's concurrent run having already advanced past the SECOND
     // occurrence's expected value, so the CAS on that advance call fails.
     // The service must create exactly 2 transactions and stop, not 3+.

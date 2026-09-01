@@ -23,7 +23,8 @@ create policy "members can update recurring_transactions" on recurring_transacti
 create policy "members can delete recurring_transactions" on recurring_transactions for delete using (is_household_member(household_id));
 
 -- widen transactions.source so recurring-transaction catch-up can tag what
--- it creates. Replace <실제_제약_이름> below with the name found in Step 1.
+-- it creates (transactions_source_check is the actual auto-generated
+-- constraint name, confirmed via pg_constraint).
 alter table transactions drop constraint transactions_source_check;
 alter table transactions add constraint transactions_source_check
   check (source in ('manual', 'notification_auto', 'recurring_auto'));
