@@ -81,7 +81,12 @@ void main() {
     expect(patch1Request.method, 'PATCH');
     final patch1Body = jsonDecode(await utf8.decodeStream(patch1Request)) as Map<String, dynamic>;
     expect(patch1Body['next_run_at'], '2026-08-15T00:00:00.000Z');
-    patch1Request.response.statusCode = HttpStatus.noContent;
+    patch1Request.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode([
+        {'id': 'rt-1'},
+      ]));
     await patch1Request.response.close();
 
     // 4: second overdue occurrence — creates the August transaction
@@ -109,7 +114,12 @@ void main() {
     expect(patch2Request.method, 'PATCH');
     final patch2Body = jsonDecode(await utf8.decodeStream(patch2Request)) as Map<String, dynamic>;
     expect(patch2Body['next_run_at'], '2026-09-15T00:00:00.000Z');
-    patch2Request.response.statusCode = HttpStatus.noContent;
+    patch2Request.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode([
+        {'id': 'rt-1'},
+      ]));
     await patch2Request.response.close();
 
     expect(await future, 2);
@@ -194,7 +204,12 @@ void main() {
         patchCount++;
         final body = jsonDecode(await utf8.decodeStream(request)) as Map<String, dynamic>;
         lastPatchedNextRunAt = DateTime.parse(body['next_run_at'] as String);
-        request.response.statusCode = HttpStatus.noContent;
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode([
+            {'id': 'rt-1'},
+          ]));
         await request.response.close();
       }
     });
@@ -208,5 +223,77 @@ void main() {
     // past it (not created — the cap already tripped) lands on Mar 2, which
     // is what gets persisted as the template's new next_run_at.
     expect(lastPatchedNextRunAt, DateTime.utc(2026, 3, 2));
+  });
+
+  test('stops a template early when a concurrent session already advanced next_run_at (CAS failure)', () async {
+    // A DAILY template overdue 3 days (2026-08-01 through 2026-08-03, checked
+    // as of 2026-08-05) — but the mock PATCH handler simulates another
+    // session's concurrent run having already advanced past the SECOND
+    // occurrence's expected value, so the CAS on that advance call fails.
+    // The service must create exactly 2 transactions and stop, not 3+.
+    var postCount = 0;
+    var patchCount = 0;
+
+    mockServer.listen((request) async {
+      if (request.method == 'GET' && request.uri.path.endsWith('/recurring_transactions')) {
+        await request.drain<void>();
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode([
+            {
+              'id': 'rt-1',
+              'account_id': 'account-1',
+              'category_id': 'category-1',
+              'created_by': 'member-1',
+              'type': 'expense',
+              'amount': 1000,
+              'interval_rule': 'DAILY',
+              'next_run_at': DateTime.utc(2026, 8, 1).toIso8601String(),
+              'memo': null,
+            },
+          ]));
+        await request.response.close();
+      } else if (request.method == 'POST' && request.uri.path.endsWith('/transactions')) {
+        postCount++;
+        await request.drain<void>();
+        request.response
+          ..statusCode = HttpStatus.created
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode([
+            {
+              'id': 'txn-$postCount', 'account_id': 'account-1', 'category_id': 'category-1',
+              'member_id': 'member-1', 'type': 'expense', 'amount': 1000,
+              'occurred_at': DateTime.now().toUtc().toIso8601String(), 'source': 'recurring_auto',
+              'memo': null, 'merchant': null,
+            },
+          ]));
+        await request.response.close();
+      } else if (request.method == 'PATCH' && request.uri.path.endsWith('/recurring_transactions')) {
+        patchCount++;
+        await request.drain<void>();
+        if (patchCount == 2) {
+          // simulate another session having already moved next_run_at past this point
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode(<dynamic>[]));
+        } else {
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode([
+              {'id': 'rt-1'},
+            ]));
+        }
+        await request.response.close();
+      }
+    });
+
+    final count = await service.run('household-1', now: DateTime.utc(2026, 8, 5));
+
+    expect(count, 2);
+    expect(postCount, 2);
+    expect(patchCount, 2);
   });
 }

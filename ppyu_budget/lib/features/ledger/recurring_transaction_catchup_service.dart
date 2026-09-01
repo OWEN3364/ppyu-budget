@@ -14,10 +14,13 @@ class RecurringTransactionCatchUpService {
   final TransactionRepository transactionRepository;
 
   /// Checks every due recurring-transaction template for [householdId] and
-  /// creates the transactions it's behind on, one at a time — persisting
-  /// `next_run_at` after each successful create so a failure partway
-  /// through never loses progress or risks a duplicate on retry. Returns
-  /// how many transactions were created (0 if nothing was due).
+  /// creates the transactions it's behind on, one at a time, using a
+  /// compare-and-swap on `next_run_at` after each create so concurrent
+  /// catch-up runs (e.g. both household members opening the app the same
+  /// day) can duplicate at most the single occurrence each session was
+  /// already mid-creating when the race was detected — never the whole
+  /// overdue batch. Returns how many transactions were created (0 if
+  /// nothing was due).
   ///
   /// [now] defaults to the real current time; tests pass a fixed value so
   /// the "is this due yet" cutoff is deterministic.
@@ -30,6 +33,7 @@ class RecurringTransactionCatchUpService {
       var cursor = template.nextRunAt;
       var countForTemplate = 0;
       while (!cursor.isAfter(cutoff) && countForTemplate < maxCatchUpOccurrences) {
+        final occurrenceDate = cursor;
         await transactionRepository.create(
           householdId: householdId,
           accountId: template.accountId,
@@ -39,12 +43,18 @@ class RecurringTransactionCatchUpService {
           amount: template.amount,
           memo: template.memo,
           source: 'recurring_auto',
-          occurredAt: cursor,
+          occurredAt: occurrenceDate,
         );
-        cursor = advanceOccurrence(template.intervalRule, cursor);
-        await recurringTransactionRepository.advanceNextRunAt(template.id, cursor);
+        final nextCursor = advanceOccurrence(template.intervalRule, occurrenceDate);
+        final advanced = await recurringTransactionRepository.advanceNextRunAt(
+          template.id,
+          nextCursor,
+          expectedCurrentNextRunAt: occurrenceDate,
+        );
         createdCount++;
         countForTemplate++;
+        if (!advanced) break; // another session already advanced past this point — stop here
+        cursor = nextCursor;
       }
     }
 

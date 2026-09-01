@@ -87,18 +87,58 @@ void main() {
     await future;
   });
 
-  test('advanceNextRunAt only sends next_run_at, converted to UTC', () async {
-    final future = repo.advanceNextRunAt('rt-1', DateTime.parse('2026-10-05T21:00:00.000Z').toLocal());
+  test('advanceNextRunAt only sends next_run_at, converted to UTC, filtered by the expected current value', () async {
+    final future = repo.advanceNextRunAt(
+      'rt-1',
+      DateTime.parse('2026-10-05T21:00:00.000Z').toLocal(),
+      expectedCurrentNextRunAt: DateTime.parse('2026-09-05T21:00:00.000Z').toLocal(),
+    );
 
     final request = await mockServer.first;
     expect(request.method, 'PATCH');
     expect(request.uri.queryParameters['id'], 'eq.rt-1');
+    expect(request.uri.queryParameters['next_run_at'], 'eq.2026-09-05T21:00:00.000Z');
     final bodyStr = await utf8.decodeStream(request);
     expect(jsonDecode(bodyStr), {'next_run_at': '2026-10-05T21:00:00.000Z'});
-    request.response.statusCode = HttpStatus.noContent;
+    request.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode([
+        {
+          'id': 'rt-1',
+          'account_id': 'account-1',
+          'category_id': 'category-1',
+          'created_by': 'member-1',
+          'type': 'expense',
+          'amount': 50000,
+          'interval_rule': 'MONTHLY',
+          'next_run_at': '2026-10-05T21:00:00.000Z',
+          'memo': null,
+        },
+      ]));
     await request.response.close();
 
-    await future;
+    expect(await future, isTrue);
+  });
+
+  test('advanceNextRunAt returns false when the live value no longer matches (concurrent advance)', () async {
+    final future = repo.advanceNextRunAt(
+      'rt-1',
+      DateTime.parse('2026-10-05T21:00:00.000Z').toLocal(),
+      expectedCurrentNextRunAt: DateTime.parse('2026-09-05T21:00:00.000Z').toLocal(),
+    );
+
+    final request = await mockServer.first;
+    expect(request.method, 'PATCH');
+    // PostgREST returns an empty array, not an error, when the filter
+    // (id + stale next_run_at) matches zero rows — someone else already moved it.
+    request.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode(<dynamic>[]));
+    await request.response.close();
+
+    expect(await future, isFalse);
   });
 
   test('update sends next_run_at converted to UTC', () async {
