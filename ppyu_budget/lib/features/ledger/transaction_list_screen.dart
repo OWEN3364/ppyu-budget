@@ -151,7 +151,9 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                         return ListTile(
                           leading: t.source == 'notification_auto'
                               ? const Icon(Icons.notifications_active, size: 20)
-                              : null,
+                              : t.source == 'recurring_auto'
+                                  ? const Icon(Icons.repeat, size: 20)
+                                  : null,
                           title: Text(t.merchant?.isNotEmpty == true ? t.merchant! : (t.memo ?? '(내용 없음)')),
                           subtitle: Text('${_formatDate(t.occurredAt)} · ${_nicknames[t.memberId] ?? '가족 구성원'}'),
                           trailing: Text('$sign${t.amount}원'),
