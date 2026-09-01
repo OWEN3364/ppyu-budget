@@ -6,6 +6,8 @@ import 'package:ppyu_budget/features/household/join_screen.dart';
 import 'package:ppyu_budget/features/ledger/account_screen.dart';
 import 'package:ppyu_budget/features/ledger/budget_screen.dart';
 import 'package:ppyu_budget/features/ledger/category_screen.dart';
+import 'package:ppyu_budget/features/ledger/recurring_transaction_catchup_service.dart' show recurringTransactionCatchUpService;
+import 'package:ppyu_budget/features/ledger/recurring_transaction_screen.dart';
 import 'package:ppyu_budget/features/ledger/savings_goal_screen.dart';
 import 'package:ppyu_budget/features/ledger/tag_management_screen.dart';
 import 'package:ppyu_budget/features/ledger/transaction_list_screen.dart';
@@ -59,6 +61,21 @@ class _HomeScreenState extends State<HomeScreen> {
       _loading = false;
       _recommendationsFuture = householdId != null ? _fetchRecommendations(householdId) : null;
     });
+    if (householdId != null) {
+      _runCatchUp(householdId);
+    }
+  }
+
+  Future<void> _runCatchUp(String householdId) async {
+    try {
+      final count = await recurringTransactionCatchUpService.run(householdId);
+      if (!mounted || count == 0) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$count건의 반복거래가 등록됐어요')),
+      );
+    } catch (_) {
+      // 조용히 무시 — 다음 홈 화면 진입 때 다시 시도된다.
+    }
   }
 
   // Swallows failures (including a synchronous throw from the statsRepository
@@ -199,6 +216,12 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('이번 달 예산'),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => BudgetScreen(householdId: householdId),
+              )),
+            ),
+            ListTile(
+              title: const Text('반복거래 관리'),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => RecurringTransactionListScreen(householdId: householdId),
               )),
             ),
             ListTile(
