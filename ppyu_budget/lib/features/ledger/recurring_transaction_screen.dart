@@ -235,7 +235,10 @@ class _RecurringTransactionFormScreenState extends State<RecurringTransactionFor
           type: _type,
           amount: amount,
           intervalRule: _intervalRule,
-          nextRunAt: _nextRunAt,
+          // only write the date back if the user actually changed it — sending
+          // the value this form loaded could roll next_run_at backwards past
+          // occurrences a background catch-up already created
+          nextRunAt: _nextRunAt == existing.nextRunAt ? null : _nextRunAt,
           memo: memo,
         );
       }

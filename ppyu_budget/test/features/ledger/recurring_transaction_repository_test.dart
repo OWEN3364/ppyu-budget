@@ -180,6 +180,52 @@ void main() {
     await future;
   });
 
+  test('update omits next_run_at entirely when nextRunAt is null', () async {
+    final future = repo.update(
+      id: 'rt-1',
+      accountId: 'account-2',
+      categoryId: 'category-2',
+      type: 'income',
+      amount: 100000,
+      intervalRule: 'WEEKLY',
+      memo: 'Only the memo changed',
+    );
+
+    final request = await mockServer.first;
+    expect(request.method, 'PATCH');
+    final bodyStr = await utf8.decodeStream(request);
+    // the key must be absent, not present-with-null: an in-flight catch-up may
+    // have advanced next_run_at since this form loaded, and writing either the
+    // stale value or null would clobber it
+    expect(jsonDecode(bodyStr), {
+      'account_id': 'account-2',
+      'category_id': 'category-2',
+      'type': 'income',
+      'amount': 100000,
+      'interval_rule': 'WEEKLY',
+      'memo': 'Only the memo changed',
+    });
+    request.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode([
+        {
+          'id': 'rt-1',
+          'account_id': 'account-2',
+          'category_id': 'category-2',
+          'created_by': 'member-1',
+          'type': 'income',
+          'amount': 100000,
+          'interval_rule': 'WEEKLY',
+          'next_run_at': '2026-11-05T21:00:00.000Z',
+          'memo': 'Only the memo changed',
+        },
+      ]));
+    await request.response.close();
+
+    await future;
+  });
+
   test('delete removes a template by id', () async {
     final future = repo.delete('rt-1');
 

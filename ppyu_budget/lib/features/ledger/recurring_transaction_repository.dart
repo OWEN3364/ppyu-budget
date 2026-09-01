@@ -36,6 +36,11 @@ class RecurringTransactionRepository {
     return RecurringTransaction.fromJson(rows.first);
   }
 
+  /// Updates an existing template. [nextRunAt] is optional and the key is
+  /// omitted from the payload entirely when null — an edit form that didn't
+  /// touch the date must NOT write back the (possibly stale) value it loaded,
+  /// or it would roll the schedule backwards past occurrences an in-flight
+  /// catch-up already created, and the next catch-up would replay them all.
   Future<RecurringTransaction> update({
     required String id,
     required String accountId,
@@ -43,7 +48,7 @@ class RecurringTransactionRepository {
     required String type,
     required int amount,
     required String intervalRule,
-    required DateTime nextRunAt,
+    DateTime? nextRunAt,
     String? memo,
   }) async {
     final rows = await _client
@@ -54,7 +59,7 @@ class RecurringTransactionRepository {
           'type': type,
           'amount': amount,
           'interval_rule': intervalRule,
-          'next_run_at': nextRunAt.toUtc().toIso8601String(),
+          if (nextRunAt != null) 'next_run_at': nextRunAt.toUtc().toIso8601String(),
           'memo': memo,
         })
         .eq('id', id)
