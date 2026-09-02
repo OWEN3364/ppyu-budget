@@ -54,7 +54,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
 
   Future<void> _load() async {
     try {
-      final transactions = await transactionRepository.list(widget.householdId);
+      final transactions = await transactionRepository.list(widget.householdId, confirmed: true);
       final tags = await tagRepository.list(widget.householdId);
       final nicknames = await householdRepository.nicknamesByMemberId(widget.householdId);
       if (!mounted) return;
