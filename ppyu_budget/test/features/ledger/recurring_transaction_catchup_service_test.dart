@@ -73,7 +73,7 @@ void main() {
       ..write(jsonEncode(<dynamic>[]));
     await occurredRequest.response.close();
 
-    // MONTHLY from 2026-07-15 through 2026-09-20 (cutoff) = July and August only
+    // MONTHLY from 2026-07-15 through 2026-08-20 (cutoff) = July and August only
     for (final expectedDate in ['2026-07-15T00:00:00.000Z', '2026-08-15T00:00:00.000Z']) {
       await requests.moveNext();
       final txnRequest = requests.current;
@@ -108,9 +108,11 @@ void main() {
       ..write(jsonEncode([_templateRow(startAt: DateTime.utc(2026, 7, 15).toIso8601String(), autoRegister: false)]));
     await listRequest.response.close();
 
-    // no further requests should follow — the mock server has nothing else
-    // queued, so a second request would hang; the test's overall timeout
-    // catches a regression that fires one.
+    // No further requests should follow. `mockServer.first` closes the
+    // server's listening socket after taking that one request, so a
+    // regression that fires a second request gets connection-refused and
+    // `run()` throws a SocketException — the test fails on that, not on a
+    // hang.
     expect(await future, 0);
   });
 
@@ -164,5 +166,37 @@ void main() {
     // the simulated duplicate and is ignored, the second succeeds.
     expect(count, 1);
     expect(txnAttempt, 2);
+  });
+
+  test('propagates a non-23505 PostgrestException instead of swallowing it', () async {
+    mockServer.listen((request) async {
+      if (request.method == 'GET' && request.uri.path.endsWith('/recurring_transactions')) {
+        await request.drain<void>();
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode([_templateRow(intervalRule: 'DAILY', startAt: DateTime.utc(2026, 9, 1).toIso8601String())]));
+        await request.response.close();
+      } else if (request.method == 'GET' && request.uri.path.endsWith('/transactions')) {
+        await request.drain<void>();
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode(<dynamic>[]));
+        await request.response.close();
+      } else if (request.method == 'POST' && request.uri.path.endsWith('/transactions')) {
+        await request.drain<void>();
+        request.response
+          ..statusCode = HttpStatus.forbidden
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode({'code': '42501', 'message': 'permission denied'}));
+        await request.response.close();
+      }
+    });
+
+    await expectLater(
+      service.run('household-1', now: DateTime.utc(2026, 9, 1)),
+      throwsA(isA<PostgrestException>().having((e) => e.code, 'code', '42501')),
+    );
   });
 }

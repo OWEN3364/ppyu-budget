@@ -95,8 +95,8 @@ class _NotificationOnboardingScreenState extends State<NotificationOnboardingScr
           children: [
             const Text(
               '카드/은행 결제 알림이 뜰 때 자동으로 거래를 기록해주는 기능을 준비 중이에요.\n'
-              '지금은 알림 접근 권한만 설정하는 단계이고, 실제로 거래가 자동 저장되기 시작하는\n'
-              '건 다음 업데이트에서 연결할 예정이에요.\n'
+              '지금은 알림 접근 권한을 설정하는 단계예요. 아래 설정은 지금 바꿔두시면\n'
+              '자동 기록이 연결되는 다음 업데이트부터 그대로 적용돼요.\n'
               'SMS가 아니라 "알림"을 읽는 방식이라 문자 읽기 권한은 필요 없어요.',
             ),
             const SizedBox(height: 16),
@@ -130,7 +130,10 @@ class _NotificationOnboardingScreenState extends State<NotificationOnboardingScr
                       await notificationSettings.setConfirmBeforeSave(v);
                     },
             ),
-            if (_confirmBeforeSave == true)
+            // Shown regardless of the toggle's VALUE: turning it off must not
+            // strand rows that piled up while it was on. The pending screen
+            // has its own empty state when there's nothing to review.
+            if (_confirmBeforeSave != null)
               ElevatedButton(
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute(
                   builder: (_) => NotificationPendingScreen(householdId: widget.householdId),
