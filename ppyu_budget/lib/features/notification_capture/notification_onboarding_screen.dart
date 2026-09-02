@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/features/notification_capture/notification_capture_service.dart';
+import 'package:ppyu_budget/features/notification_capture/notification_pending_screen.dart';
+import 'package:ppyu_budget/features/notification_capture/notification_settings.dart';
 
 final notificationCaptureService = NotificationCaptureService();
 
 class NotificationOnboardingScreen extends StatefulWidget {
-  const NotificationOnboardingScreen({super.key});
+  const NotificationOnboardingScreen({super.key, required this.householdId});
+
+  final String householdId;
 
   @override
   State<NotificationOnboardingScreen> createState() => _NotificationOnboardingScreenState();
@@ -13,6 +17,7 @@ class NotificationOnboardingScreen extends StatefulWidget {
 class _NotificationOnboardingScreenState extends State<NotificationOnboardingScreen>
     with WidgetsBindingObserver {
   bool? _granted;
+  bool? _confirmBeforeSave;
   // Task 6's NotificationCaptureService documents that openAccessSettings()
   // and isAccessGranted() must never overlap in time (the native side shares
   // one result callback across all plugin methods, so calling isAccessGranted()
@@ -27,6 +32,7 @@ class _NotificationOnboardingScreenState extends State<NotificationOnboardingScr
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _refresh();
+    _loadSetting();
   }
 
   @override
@@ -53,6 +59,11 @@ class _NotificationOnboardingScreenState extends State<NotificationOnboardingScr
       if (!mounted) return;
       setState(() => _error = '상태 확인에 실패했어요');
     }
+  }
+
+  Future<void> _loadSetting() async {
+    final value = await notificationSettings.confirmBeforeSave();
+    if (mounted) setState(() => _confirmBeforeSave = value);
   }
 
   Future<void> _openSettings() async {
@@ -106,6 +117,25 @@ class _NotificationOnboardingScreenState extends State<NotificationOnboardingScr
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(_error!, style: const TextStyle(color: Colors.red)),
+              ),
+            const SizedBox(height: 24),
+            SwitchListTile(
+              title: const Text('확인 후 저장'),
+              subtitle: const Text('꺼두면 인식된 거래가 바로 저장돼요. 켜두면 확인 후 저장 목록에서 검토 후 저장돼요.'),
+              value: _confirmBeforeSave ?? false,
+              onChanged: _confirmBeforeSave == null
+                  ? null
+                  : (v) async {
+                      setState(() => _confirmBeforeSave = v);
+                      await notificationSettings.setConfirmBeforeSave(v);
+                    },
+            ),
+            if (_confirmBeforeSave == true)
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => NotificationPendingScreen(householdId: widget.householdId),
+                )),
+                child: const Text('확인 후 저장 목록 보기'),
               ),
             const SizedBox(height: 24),
             const Text(

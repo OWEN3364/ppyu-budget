@@ -6,6 +6,7 @@ import 'package:ppyu_budget/features/ledger/category_repository.dart';
 import 'package:ppyu_budget/features/ledger/transaction_repository.dart';
 import 'package:ppyu_budget/features/notification_capture/notification_capture_service.dart';
 import 'package:ppyu_budget/features/notification_capture/notification_parser.dart';
+import 'package:ppyu_budget/features/notification_capture/notification_settings.dart';
 
 class NotificationAutoSaveService {
   NotificationAutoSaveService({
@@ -66,6 +67,7 @@ class NotificationAutoSaveService {
         : (categories.isNotEmpty ? categories.first.id : null);
     if (categoryId == null) return;
 
+    final confirmBeforeSave = await notificationSettings.confirmBeforeSave();
     await transactionRepository.create(
       householdId: householdId,
       accountId: accountId,
@@ -75,6 +77,7 @@ class NotificationAutoSaveService {
       amount: parsed.amount,
       merchant: parsed.merchant,
       source: 'notification_auto',
+      confirmed: !confirmBeforeSave,
     );
   }
 }

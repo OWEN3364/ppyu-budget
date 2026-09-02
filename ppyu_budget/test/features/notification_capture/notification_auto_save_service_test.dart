@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ppyu_budget/features/ledger/account_repository.dart';
 import 'package:ppyu_budget/features/ledger/category_repository.dart';
@@ -33,6 +34,7 @@ void main() {
       );
 
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
     mockServer = await HttpServer.bind('localhost', 0);
     requests = StreamIterator<HttpRequest>(mockServer);
     final supabaseUrl = 'http://${mockServer.address.host}:${mockServer.port}';
@@ -203,5 +205,29 @@ void main() {
     // give the stream a moment to process, then confirm no request was made
     await Future<void>.delayed(const Duration(milliseconds: 50));
     expect(mockServer.first.timeout(const Duration(milliseconds: 50)), throwsA(anything));
+  });
+
+  test('creates a pending (unconfirmed) transaction when confirm-before-save is on', () async {
+    SharedPreferences.setMockInitialValues({'notification_confirm_before_save': true});
+    service.start();
+    notificationController.add(notif('com.samsung.android.spay', '5,000원 승인 스타벅스'));
+
+    await respondJson([]); // account lookup
+    await respondJson([
+      {'id': 'acc-1', 'name': '삼성페이', 'type': 'card'}
+    ], status: 201); // account creation
+    await respondJson([
+      {'id': 'cat-1', 'name': '기타', 'type': 'expense', 'icon': null, 'is_default': true}
+    ]); // category lookup
+    final (txnInsert, txnBody) = await respondJson([
+      {
+        'id': 't1', 'account_id': 'acc-1', 'category_id': 'cat-1', 'member_id': 'member-1',
+        'type': 'expense', 'amount': 5000, 'occurred_at': DateTime.now().toUtc().toIso8601String(),
+        'source': 'notification_auto', 'memo': null, 'merchant': '스타벅스',
+      }
+    ], status: 201);
+    expect(txnInsert.uri.path, endsWith('/transactions'));
+    final body = jsonDecode(txnBody) as Map<String, dynamic>;
+    expect(body['confirmed'], false);
   });
 }
