@@ -36,3 +36,13 @@ alter table transactions
 create unique index transactions_recurring_occurrence_unique
   on transactions (recurring_transaction_id, occurred_at)
   where recurring_transaction_id is not null;
+
+-- update policy must also validate owner_member_id belongs to the household,
+-- mirroring the insert policy to prevent RLS bypass: an update that sets
+-- owner_member_id to a member of a different household would otherwise
+-- succeed at the with check layer.
+drop policy "members can update recurring_transactions" on recurring_transactions;
+create policy "members can update recurring_transactions" on recurring_transactions for update using (is_household_member(household_id)) with check (
+  is_household_member(household_id)
+  and exists (select 1 from household_members m where m.id = owner_member_id and m.household_id = recurring_transactions.household_id)
+);

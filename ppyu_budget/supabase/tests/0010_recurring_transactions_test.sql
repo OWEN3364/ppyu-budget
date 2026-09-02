@@ -25,8 +25,8 @@ begin
   select id into v_member_a from household_members where household_id = v_household_a and user_id = auth.uid();
   insert into accounts (household_id, name) values (v_household_a, '테스트카드') returning id into v_account_a;
   select id into v_category_a from categories where household_id = v_household_a and type = 'expense' limit 1;
-  insert into recurring_transactions (household_id, account_id, category_id, created_by, type, amount, interval_rule, next_run_at)
-  values (v_household_a, v_account_a, v_category_a, v_member_a, 'expense', 50000, 'MONTHLY', now())
+  insert into recurring_transactions (household_id, account_id, category_id, created_by, owner_member_id, type, amount, interval_rule, start_at)
+  values (v_household_a, v_account_a, v_category_a, v_member_a, v_member_a, 'expense', 50000, 'MONTHLY', now())
   returning id into v_template_id;
 
   perform set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
@@ -60,8 +60,8 @@ begin
   select id into v_category_a from categories where household_id = v_household_a and type = 'expense' limit 1;
 
   begin
-    insert into recurring_transactions (household_id, account_id, category_id, created_by, type, amount, interval_rule, next_run_at)
-    values (v_household_a, v_account_a, v_category_a, v_member_b, 'expense', 50000, 'MONTHLY', now());
+    insert into recurring_transactions (household_id, account_id, category_id, created_by, owner_member_id, type, amount, interval_rule, start_at)
+    values (v_household_a, v_account_a, v_category_a, v_member_b, v_member_b, 'expense', 50000, 'MONTHLY', now());
   exception when others then
     v_raised := true;
   end;
