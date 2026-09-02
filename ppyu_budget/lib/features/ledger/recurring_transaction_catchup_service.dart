@@ -1,3 +1,4 @@
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import 'package:ppyu_budget/core/supabase_client.dart';
 import 'package:ppyu_budget/features/ledger/recurring_transaction_repository.dart';
 import 'package:ppyu_budget/features/ledger/recurring_transaction_schedule.dart';
@@ -13,14 +14,16 @@ class RecurringTransactionCatchUpService {
   final RecurringTransactionRepository recurringTransactionRepository;
   final TransactionRepository transactionRepository;
 
-  /// Checks every due recurring-transaction template for [householdId] and
-  /// creates the transactions it's behind on, one at a time, using a
-  /// compare-and-swap on `next_run_at` after each create so concurrent
-  /// catch-up runs (e.g. both household members opening the app the same
-  /// day) can duplicate at most the single occurrence each session was
-  /// already mid-creating when the race was detected — never the whole
-  /// overdue batch. Returns how many transactions were created (0 if
-  /// nothing was due).
+  /// Silently creates every occurrence an `auto_register=true` template is
+  /// behind on, for [householdId]. Concurrency is no longer this service's
+  /// concern: `transactions_recurring_occurrence_unique` (a DB-level partial
+  /// unique index) makes a duplicate insert fail outright, so two
+  /// overlapping runs (e.g. both household members opening the app at the
+  /// same moment) each simply attempt every missing date, and whichever
+  /// insert loses the race is rejected by Postgres and ignored here.
+  /// `auto_register=false` templates are skipped entirely — their missing
+  /// occurrences surface in the todo screen (Task 6) instead. Returns how
+  /// many transactions were actually created.
   ///
   /// [now] defaults to the real current time; tests pass a fixed value so
   /// the "is this due yet" cutoff is deterministic.
@@ -29,32 +32,30 @@ class RecurringTransactionCatchUpService {
     final templates = await recurringTransactionRepository.list(householdId);
     var createdCount = 0;
 
-    for (final template in templates) {
-      var cursor = template.nextRunAt;
-      var countForTemplate = 0;
-      while (!cursor.isAfter(cutoff) && countForTemplate < maxCatchUpOccurrences) {
-        final occurrenceDate = cursor;
-        await transactionRepository.create(
-          householdId: householdId,
-          accountId: template.accountId,
-          categoryId: template.categoryId,
-          memberId: template.createdBy,
-          type: template.type,
-          amount: template.amount,
-          memo: template.memo,
-          source: 'recurring_auto',
-          occurredAt: occurrenceDate,
-        );
-        final nextCursor = advanceOccurrence(template.intervalRule, occurrenceDate);
-        final advanced = await recurringTransactionRepository.advanceNextRunAt(
-          template.id,
-          nextCursor,
-          expectedCurrentNextRunAt: occurrenceDate,
-        );
-        createdCount++;
-        countForTemplate++;
-        if (!advanced) break; // another session already advanced past this point — stop here
-        cursor = nextCursor;
+    for (final template in templates.where((t) => t.autoRegister)) {
+      final existing = await transactionRepository.occurredAtsForRecurringTransaction(template.id);
+      final missing = missingOccurrences(template, now: cutoff, existingOccurredAt: existing);
+      for (final occurrenceDate in missing) {
+        try {
+          await transactionRepository.create(
+            householdId: householdId,
+            accountId: template.accountId,
+            categoryId: template.categoryId,
+            memberId: template.ownerMemberId,
+            type: template.type,
+            amount: template.amount,
+            memo: template.memo,
+            source: 'recurring_auto',
+            occurredAt: occurrenceDate,
+            recurringTransactionId: template.id,
+          );
+          createdCount++;
+        } on PostgrestException catch (e) {
+          // 23505 = unique_violation — another session created this exact
+          // occurrence between our read and our insert. See Global
+          // Constraints for why this is the correct check.
+          if (e.code != '23505') rethrow;
+        }
       }
     }
 

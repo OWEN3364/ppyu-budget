@@ -28,142 +28,94 @@ void main() {
     await mockServer.close(force: true);
   });
 
-  test('creates one transaction per overdue occurrence and advances next_run_at incrementally', () async {
+  Map<String, dynamic> _templateRow({
+    String id = 'rt-1',
+    String intervalRule = 'MONTHLY',
+    required String startAt,
+    bool autoRegister = true,
+  }) =>
+      {
+        'id': id,
+        'account_id': 'account-1',
+        'category_id': 'category-1',
+        'created_by': 'member-1',
+        'owner_member_id': 'member-1',
+        'type': 'expense',
+        'amount': 50000,
+        'interval_rule': intervalRule,
+        'start_at': startAt,
+        'auto_register': autoRegister,
+        'memo': '월세',
+      };
+
+  test('creates one transaction per missing occurrence for an auto_register template', () async {
     final requests = StreamIterator<HttpRequest>(mockServer);
+    // MONTHLY from 2026-07-15, checked as of 2026-08-20: July 15 and August 15
+    // are both due; September 15 is not yet (it's after the cutoff).
     final future = service.run('household-1', now: DateTime.utc(2026, 8, 20));
 
-    // 1: list recurring_transactions — one MONTHLY template last run 2026-07-15
     await requests.moveNext();
     final listRequest = requests.current;
     await listRequest.drain<void>();
     listRequest.response
       ..statusCode = HttpStatus.ok
       ..headers.contentType = ContentType.json
-      ..write(jsonEncode([
-        {
-          'id': 'rt-1',
-          'account_id': 'account-1',
-          'category_id': 'category-1',
-          'created_by': 'member-1',
-          'type': 'expense',
-          'amount': 50000,
-          'interval_rule': 'MONTHLY',
-          'next_run_at': DateTime.utc(2026, 7, 15).toIso8601String(),
-          'memo': '월세',
-        },
-      ]));
+      ..write(jsonEncode([_templateRow(startAt: DateTime.utc(2026, 7, 15).toIso8601String())]));
     await listRequest.response.close();
 
-    // 2: first overdue occurrence — creates the July transaction
+    // occurredAtsForRecurringTransaction — nothing created yet
     await requests.moveNext();
-    final txn1Request = requests.current;
-    expect(txn1Request.method, 'POST');
-    expect(txn1Request.uri.path, endsWith('/transactions'));
-    final txn1Body = jsonDecode(await utf8.decodeStream(txn1Request)) as Map<String, dynamic>;
-    expect(txn1Body['occurred_at'], '2026-07-15T00:00:00.000Z');
-    expect(txn1Body['source'], 'recurring_auto');
-    txn1Request.response
-      ..statusCode = HttpStatus.created
-      ..headers.contentType = ContentType.json
-      ..write(jsonEncode([
-        {
-          'id': 'txn-1', 'account_id': 'account-1', 'category_id': 'category-1',
-          'member_id': 'member-1', 'type': 'expense', 'amount': 50000,
-          'occurred_at': '2026-07-15T00:00:00.000Z', 'source': 'recurring_auto',
-          'memo': '월세', 'merchant': null,
-        },
-      ]));
-    await txn1Request.response.close();
-
-    // 3: advance next_run_at to August right after the July occurrence succeeds
-    await requests.moveNext();
-    final patch1Request = requests.current;
-    expect(patch1Request.method, 'PATCH');
-    final patch1Body = jsonDecode(await utf8.decodeStream(patch1Request)) as Map<String, dynamic>;
-    expect(patch1Body['next_run_at'], '2026-08-15T00:00:00.000Z');
-    patch1Request.response
+    final occurredRequest = requests.current;
+    await occurredRequest.drain<void>();
+    occurredRequest.response
       ..statusCode = HttpStatus.ok
       ..headers.contentType = ContentType.json
-      ..write(jsonEncode([
-        {'id': 'rt-1'},
-      ]));
-    await patch1Request.response.close();
+      ..write(jsonEncode(<dynamic>[]));
+    await occurredRequest.response.close();
 
-    // 4: second overdue occurrence — creates the August transaction
-    await requests.moveNext();
-    final txn2Request = requests.current;
-    expect(txn2Request.method, 'POST');
-    final txn2Body = jsonDecode(await utf8.decodeStream(txn2Request)) as Map<String, dynamic>;
-    expect(txn2Body['occurred_at'], '2026-08-15T00:00:00.000Z');
-    txn2Request.response
-      ..statusCode = HttpStatus.created
-      ..headers.contentType = ContentType.json
-      ..write(jsonEncode([
-        {
-          'id': 'txn-2', 'account_id': 'account-1', 'category_id': 'category-1',
-          'member_id': 'member-1', 'type': 'expense', 'amount': 50000,
-          'occurred_at': '2026-08-15T00:00:00.000Z', 'source': 'recurring_auto',
-          'memo': '월세', 'merchant': null,
-        },
-      ]));
-    await txn2Request.response.close();
-
-    // 5: advance next_run_at to September (now past `now`, so the loop stops there)
-    await requests.moveNext();
-    final patch2Request = requests.current;
-    expect(patch2Request.method, 'PATCH');
-    final patch2Body = jsonDecode(await utf8.decodeStream(patch2Request)) as Map<String, dynamic>;
-    expect(patch2Body['next_run_at'], '2026-09-15T00:00:00.000Z');
-    patch2Request.response
-      ..statusCode = HttpStatus.ok
-      ..headers.contentType = ContentType.json
-      ..write(jsonEncode([
-        {'id': 'rt-1'},
-      ]));
-    await patch2Request.response.close();
+    // MONTHLY from 2026-07-15 through 2026-09-20 (cutoff) = July and August only
+    for (final expectedDate in ['2026-07-15T00:00:00.000Z', '2026-08-15T00:00:00.000Z']) {
+      await requests.moveNext();
+      final txnRequest = requests.current;
+      final body = jsonDecode(await utf8.decodeStream(txnRequest)) as Map<String, dynamic>;
+      expect(body['occurred_at'], expectedDate);
+      expect(body['recurring_transaction_id'], 'rt-1');
+      txnRequest.response
+        ..statusCode = HttpStatus.created
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode([
+          {
+            'id': 'txn-$expectedDate', 'account_id': 'account-1', 'category_id': 'category-1',
+            'member_id': 'member-1', 'type': 'expense', 'amount': 50000,
+            'occurred_at': expectedDate, 'source': 'recurring_auto', 'memo': '월세', 'merchant': null,
+          },
+        ]));
+      await txnRequest.response.close();
+    }
 
     expect(await future, 2);
     await requests.cancel();
   });
 
-  test('a template that is not yet due creates nothing', () async {
-    final requests = StreamIterator<HttpRequest>(mockServer);
-    final future = service.run('household-1', now: DateTime.utc(2026, 8, 20));
+  test('skips a template entirely when auto_register is false', () async {
+    final future = service.run('household-1', now: DateTime.utc(2026, 9, 20));
 
-    await requests.moveNext();
-    final listRequest = requests.current;
+    final listRequest = await mockServer.first;
     await listRequest.drain<void>();
     listRequest.response
       ..statusCode = HttpStatus.ok
       ..headers.contentType = ContentType.json
-      ..write(jsonEncode([
-        {
-          'id': 'rt-1',
-          'account_id': 'account-1',
-          'category_id': 'category-1',
-          'created_by': 'member-1',
-          'type': 'expense',
-          'amount': 50000,
-          'interval_rule': 'MONTHLY',
-          'next_run_at': DateTime.utc(2026, 10, 1).toIso8601String(),
-          'memo': null,
-        },
-      ]));
+      ..write(jsonEncode([_templateRow(startAt: DateTime.utc(2026, 7, 15).toIso8601String(), autoRegister: false)]));
     await listRequest.response.close();
 
+    // no further requests should follow — the mock server has nothing else
+    // queued, so a second request would hang; the test's overall timeout
+    // catches a regression that fires one.
     expect(await future, 0);
-    await requests.cancel();
   });
 
-  test('respects maxCatchUpOccurrences and leaves the remainder for next time', () async {
-    // A DAILY template overdue since 2026-01-01, checked on 2026-12-31, is
-    // hundreds of days behind — far more than the 60-occurrence cap. This
-    // needs ~121 request/response round trips (1 list + 60×(create+advance)),
-    // too many to script individually like the tests above — a generic
-    // path-based auto-responder counts them instead.
-    var postCount = 0;
-    var patchCount = 0;
-    DateTime? lastPatchedNextRunAt;
+  test('ignores a unique_violation from a concurrent duplicate and continues', () async {
+    var txnAttempt = 0;
 
     mockServer.listen((request) async {
       if (request.method == 'GET' && request.uri.path.endsWith('/recurring_transactions')) {
@@ -171,129 +123,46 @@ void main() {
         request.response
           ..statusCode = HttpStatus.ok
           ..headers.contentType = ContentType.json
-          ..write(jsonEncode([
-            {
-              'id': 'rt-1',
-              'account_id': 'account-1',
-              'category_id': 'category-1',
-              'created_by': 'member-1',
-              'type': 'expense',
-              'amount': 1000,
-              'interval_rule': 'DAILY',
-              'next_run_at': DateTime.utc(2026, 1, 1).toIso8601String(),
-              'memo': null,
-            },
-          ]));
+          ..write(jsonEncode([_templateRow(intervalRule: 'DAILY', startAt: DateTime.utc(2026, 9, 1).toIso8601String())]));
         await request.response.close();
-      } else if (request.method == 'POST' && request.uri.path.endsWith('/transactions')) {
-        postCount++;
-        await request.drain<void>();
-        request.response
-          ..statusCode = HttpStatus.created
-          ..headers.contentType = ContentType.json
-          ..write(jsonEncode([
-            {
-              'id': 'txn-$postCount', 'account_id': 'account-1', 'category_id': 'category-1',
-              'member_id': 'member-1', 'type': 'expense', 'amount': 1000,
-              'occurred_at': DateTime.now().toUtc().toIso8601String(), 'source': 'recurring_auto',
-              'memo': null, 'merchant': null,
-            },
-          ]));
-        await request.response.close();
-      } else if (request.method == 'PATCH' && request.uri.path.endsWith('/recurring_transactions')) {
-        patchCount++;
-        final body = jsonDecode(await utf8.decodeStream(request)) as Map<String, dynamic>;
-        lastPatchedNextRunAt = DateTime.parse(body['next_run_at'] as String);
-        request.response
-          ..statusCode = HttpStatus.ok
-          ..headers.contentType = ContentType.json
-          ..write(jsonEncode([
-            {'id': 'rt-1'},
-          ]));
-        await request.response.close();
-      }
-    });
-
-    final count = await service.run('household-1', now: DateTime.utc(2026, 12, 31));
-
-    expect(count, 60);
-    expect(postCount, 60);
-    expect(patchCount, 60);
-    // Jan 1 + 59 days (the 60th created occurrence) = Mar 1; one more advance
-    // past it (not created — the cap already tripped) lands on Mar 2, which
-    // is what gets persisted as the template's new next_run_at.
-    expect(lastPatchedNextRunAt, DateTime.utc(2026, 3, 2));
-  });
-
-  test('stops a template early when a concurrent session already advanced next_run_at (CAS failure)', () async {
-    // A DAILY template overdue 5 occurrences (2026-08-01 through 2026-08-05,
-    // checked as of 2026-08-05) — but the mock PATCH handler simulates another
-    // session's concurrent run having already advanced past the SECOND
-    // occurrence's expected value, so the CAS on that advance call fails.
-    // The service must create exactly 2 transactions and stop, not 3+.
-    var postCount = 0;
-    var patchCount = 0;
-
-    mockServer.listen((request) async {
-      if (request.method == 'GET' && request.uri.path.endsWith('/recurring_transactions')) {
+      } else if (request.method == 'GET' && request.uri.path.endsWith('/transactions')) {
         await request.drain<void>();
         request.response
           ..statusCode = HttpStatus.ok
           ..headers.contentType = ContentType.json
-          ..write(jsonEncode([
-            {
-              'id': 'rt-1',
-              'account_id': 'account-1',
-              'category_id': 'category-1',
-              'created_by': 'member-1',
-              'type': 'expense',
-              'amount': 1000,
-              'interval_rule': 'DAILY',
-              'next_run_at': DateTime.utc(2026, 8, 1).toIso8601String(),
-              'memo': null,
-            },
-          ]));
+          ..write(jsonEncode(<dynamic>[]));
         await request.response.close();
       } else if (request.method == 'POST' && request.uri.path.endsWith('/transactions')) {
-        postCount++;
+        txnAttempt++;
         await request.drain<void>();
-        request.response
-          ..statusCode = HttpStatus.created
-          ..headers.contentType = ContentType.json
-          ..write(jsonEncode([
-            {
-              'id': 'txn-$postCount', 'account_id': 'account-1', 'category_id': 'category-1',
-              'member_id': 'member-1', 'type': 'expense', 'amount': 1000,
-              'occurred_at': DateTime.now().toUtc().toIso8601String(), 'source': 'recurring_auto',
-              'memo': null, 'merchant': null,
-            },
-          ]));
-        await request.response.close();
-      } else if (request.method == 'PATCH' && request.uri.path.endsWith('/recurring_transactions')) {
-        patchCount++;
-        await request.drain<void>();
-        if (patchCount == 2) {
-          // simulate another session having already moved next_run_at past this point
+        if (txnAttempt == 1) {
+          // simulate a concurrent session having already created this exact occurrence
           request.response
-            ..statusCode = HttpStatus.ok
+            ..statusCode = HttpStatus.conflict
             ..headers.contentType = ContentType.json
-            ..write(jsonEncode(<dynamic>[]));
+            ..write(jsonEncode({'code': '23505', 'message': 'duplicate key value violates unique constraint'}));
         } else {
           request.response
-            ..statusCode = HttpStatus.ok
+            ..statusCode = HttpStatus.created
             ..headers.contentType = ContentType.json
             ..write(jsonEncode([
-              {'id': 'rt-1'},
+              {
+                'id': 'txn-$txnAttempt', 'account_id': 'account-1', 'category_id': 'category-1',
+                'member_id': 'member-1', 'type': 'expense', 'amount': 50000,
+                'occurred_at': DateTime.now().toUtc().toIso8601String(), 'source': 'recurring_auto',
+                'memo': null, 'merchant': null,
+              },
             ]));
         }
         await request.response.close();
       }
     });
 
-    final count = await service.run('household-1', now: DateTime.utc(2026, 8, 5));
+    final count = await service.run('household-1', now: DateTime.utc(2026, 9, 2));
 
-    expect(count, 2);
-    expect(postCount, 2);
-    expect(patchCount, 2);
+    // DAILY from Sep 1 through Sep 2 = 2 occurrences; the first attempt hits
+    // the simulated duplicate and is ignored, the second succeeds.
+    expect(count, 1);
+    expect(txnAttempt, 2);
   });
 }
