@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ppyu_budget/features/ledger/models/recurring_transaction.dart';
 import 'package:ppyu_budget/features/ledger/recurring_transaction_schedule.dart';
 
 void main() {
@@ -48,4 +49,70 @@ void main() {
   test('maxCatchUpOccurrences is a sane positive cap', () {
     expect(maxCatchUpOccurrences, 60);
   });
+
+  group('missingOccurrences', () {
+    test('returns every date from startAt through now when nothing exists yet', () {
+      final template = _template(startAt: DateTime(2026, 9, 1), intervalRule: 'DAILY');
+      final missing = missingOccurrences(template, now: DateTime(2026, 9, 4), existingOccurredAt: {});
+      expect(missing, [
+        DateTime(2026, 9, 1),
+        DateTime(2026, 9, 2),
+        DateTime(2026, 9, 3),
+        DateTime(2026, 9, 4),
+      ]);
+    });
+
+    test('excludes a date that already has a matching transaction', () {
+      final template = _template(startAt: DateTime(2026, 9, 1), intervalRule: 'DAILY');
+      final missing = missingOccurrences(
+        template,
+        now: DateTime(2026, 9, 3),
+        existingOccurredAt: {DateTime(2026, 9, 2)},
+      );
+      expect(missing, [DateTime(2026, 9, 1), DateTime(2026, 9, 3)]);
+    });
+
+    test('matches an existing date by instant, not by local representation', () {
+      // existingOccurredAt holds a UTC-flagged DateTime for the same instant
+      // as the second expected occurrence — must still be recognized as a match.
+      final template = _template(startAt: DateTime(2026, 9, 1), intervalRule: 'DAILY');
+      final secondOccurrenceUtc = DateTime(2026, 9, 2).toUtc();
+      final missing = missingOccurrences(
+        template,
+        now: DateTime(2026, 9, 2),
+        existingOccurredAt: {secondOccurrenceUtc},
+      );
+      expect(missing, [DateTime(2026, 9, 1)]);
+    });
+
+    test('returns nothing when startAt is after now', () {
+      final template = _template(startAt: DateTime(2026, 10, 1), intervalRule: 'DAILY');
+      final missing = missingOccurrences(template, now: DateTime(2026, 9, 1), existingOccurredAt: {});
+      expect(missing, isEmpty);
+    });
+
+    test('stops examining after maxCatchUpOccurrences even if all are missing', () {
+      final template = _template(startAt: DateTime(2026, 1, 1), intervalRule: 'DAILY');
+      final missing = missingOccurrences(template, now: DateTime(2026, 12, 31), existingOccurredAt: {});
+      expect(missing, hasLength(maxCatchUpOccurrences));
+      expect(missing.last, DateTime(2026, 1, 1).add(Duration(days: maxCatchUpOccurrences - 1)));
+    });
+  });
 }
+
+RecurringTransaction _template({
+  required DateTime startAt,
+  String intervalRule = 'DAILY',
+}) =>
+    RecurringTransaction(
+      id: 'rt-1',
+      accountId: 'account-1',
+      categoryId: 'category-1',
+      createdBy: 'member-1',
+      ownerMemberId: 'member-1',
+      type: 'expense',
+      amount: 1000,
+      intervalRule: intervalRule,
+      startAt: startAt,
+      autoRegister: false,
+    );

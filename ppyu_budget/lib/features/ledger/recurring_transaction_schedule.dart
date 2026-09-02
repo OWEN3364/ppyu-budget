@@ -1,3 +1,5 @@
+import 'package:ppyu_budget/features/ledger/models/recurring_transaction.dart';
+
 const maxCatchUpOccurrences = 60;
 
 const _weekdayCodes = {'MO': 1, 'TU': 2, 'WE': 3, 'TH': 4, 'FR': 5, 'SA': 6, 'SU': 7};
@@ -42,4 +44,35 @@ DateTime advanceOccurrence(String intervalRule, DateTime from) {
   // normal use; it exists only so a caller looping on this function always
   // terminates.
   return from.add(const Duration(days: 1));
+}
+
+/// Every occurrence [template] should have between its `startAt` and [now]
+/// (inclusive), excluding dates already covered by [existingOccurredAt].
+/// Compared by instant (`.toUtc()`), never by local calendar fields — an
+/// entry in [existingOccurredAt] may or may not already be
+/// `.toLocal()`-converted depending on which caller read it, and comparing
+/// raw DateTime values could silently miss a real match.
+///
+/// ponytail: capped at [maxCatchUpOccurrences] occurrences EXAMINED per
+/// call — the same cap that bounds silent auto-creation also bounds how far
+/// back the todo screen walks per template per load. Raise it (or split
+/// into a separate, todo-specific constant) only if a real household's
+/// overdue backlog is ever big enough to hit it in practice.
+List<DateTime> missingOccurrences(
+  RecurringTransaction template, {
+  required DateTime now,
+  required Set<DateTime> existingOccurredAt,
+}) {
+  final existingUtc = existingOccurredAt.map((d) => d.toUtc()).toSet();
+  final missing = <DateTime>[];
+  var cursor = template.startAt;
+  var visited = 0;
+  while (!cursor.isAfter(now) && visited < maxCatchUpOccurrences) {
+    if (!existingUtc.contains(cursor.toUtc())) {
+      missing.add(cursor);
+    }
+    visited++;
+    cursor = advanceOccurrence(template.intervalRule, cursor);
+  }
+  return missing;
 }
