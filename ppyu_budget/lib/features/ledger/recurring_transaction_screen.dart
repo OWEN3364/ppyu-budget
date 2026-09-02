@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ppyu_budget/core/supabase_client.dart';
+import 'package:ppyu_budget/features/household/invite_screen.dart' show householdRepository;
 import 'package:ppyu_budget/features/ledger/account_screen.dart' show accountRepository;
 import 'package:ppyu_budget/features/ledger/category_screen.dart' show categoryRepository;
 import 'package:ppyu_budget/features/ledger/models/account.dart';
@@ -52,7 +52,6 @@ class _RecurringTransactionListScreenState extends State<RecurringTransactionLis
   Widget build(BuildContext context) {
     final templates = _templates;
     return Scaffold(
-      appBar: AppBar(title: const Text('반복거래 관리')),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           await Navigator.of(context).push(MaterialPageRoute(
@@ -77,7 +76,8 @@ class _RecurringTransactionListScreenState extends State<RecurringTransactionLis
                           final sign = t.type == 'expense' ? '-' : '+';
                           return ListTile(
                             title: Text('$sign${t.amount}원 · ${_ruleLabel(t.intervalRule)}'),
-                            subtitle: Text('다음 실행: ${t.nextRunAt.year}-${t.nextRunAt.month.toString().padLeft(2, '0')}-${t.nextRunAt.day.toString().padLeft(2, '0')}'),
+                            subtitle: Text('시작일: ${t.startAt.year}-${t.startAt.month.toString().padLeft(2, '0')}-${t.startAt.day.toString().padLeft(2, '0')}'),
+                            trailing: Chip(label: Text(t.autoRegister ? '자동' : '확인 후 등록')),
                             onTap: () async {
                               await Navigator.of(context).push(MaterialPageRoute(
                                 builder: (_) => RecurringTransactionFormScreen(
@@ -117,13 +117,16 @@ class _RecurringTransactionFormScreenState extends State<RecurringTransactionFor
   late final _amountController = TextEditingController(text: widget.existing?.amount.toString() ?? '');
   late final _memoController = TextEditingController(text: widget.existing?.memo ?? '');
   late String _type = widget.existing?.type ?? 'expense';
-  late DateTime _nextRunAt = widget.existing?.nextRunAt ?? DateTime.now();
+  late DateTime _startAt = widget.existing?.startAt ?? DateTime.now();
+  late bool _autoRegister = widget.existing?.autoRegister ?? false;
   late _Frequency _frequency = _parseFrequency(widget.existing?.intervalRule);
   late final Set<String> _selectedWeekdays = _parseWeekdays(widget.existing?.intervalRule);
   List<Account>? _accounts;
   List<Category>? _categories;
   String? _accountId;
   String? _categoryId;
+  Map<String, String>? _nicknames;
+  String? _ownerMemberId;
   String? _error;
   bool _saving = false;
 
@@ -157,7 +160,25 @@ class _RecurringTransactionFormScreenState extends State<RecurringTransactionFor
     super.initState();
     _accountId = widget.existing?.accountId;
     _categoryId = widget.existing?.categoryId;
+    _ownerMemberId = widget.existing?.ownerMemberId;
     _loadOptions();
+    _loadOwnerOptions();
+  }
+
+  Future<void> _loadOwnerOptions() async {
+    try {
+      final nicknames = await householdRepository.nicknamesByMemberId(widget.householdId);
+      String? defaultOwner = _ownerMemberId;
+      defaultOwner ??= await householdRepository.myMemberId(widget.householdId);
+      if (!mounted) return;
+      setState(() {
+        _nicknames = nicknames;
+        _ownerMemberId = nicknames.containsKey(defaultOwner) ? defaultOwner : (nicknames.isNotEmpty ? nicknames.keys.first : null);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '가구 구성원을 불러오지 못했어요');
+    }
   }
 
   Future<void> _loadOptions() async {
@@ -182,20 +203,21 @@ class _RecurringTransactionFormScreenState extends State<RecurringTransactionFor
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _nextRunAt,
+      initialDate: _startAt,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
     if (picked == null || !mounted) return;
-    setState(() => _nextRunAt = DateTime(picked.year, picked.month, picked.day, _nextRunAt.hour, _nextRunAt.minute));
+    setState(() => _startAt = DateTime(picked.year, picked.month, picked.day, _startAt.hour, _startAt.minute));
   }
 
   Future<void> _save() async {
     final amount = int.tryParse(_amountController.text.trim());
     final accountId = _accountId;
     final categoryId = _categoryId;
-    if (amount == null || amount <= 0 || accountId == null || categoryId == null) {
-      setState(() => _error = '금액, 계좌, 카테고리를 확인해주세요');
+    final ownerMemberId = _ownerMemberId;
+    if (amount == null || amount <= 0 || accountId == null || categoryId == null || ownerMemberId == null) {
+      setState(() => _error = '금액, 계좌, 카테고리, 소유자를 확인해주세요');
       return;
     }
     if (_frequency == _Frequency.weekly && _selectedWeekdays.isEmpty) {
@@ -210,21 +232,18 @@ class _RecurringTransactionFormScreenState extends State<RecurringTransactionFor
       final existing = widget.existing;
       final memo = _memoController.text.trim().isEmpty ? null : _memoController.text.trim();
       if (existing == null) {
-        final memberRow = await supabase
-            .from('household_members')
-            .select('id')
-            .eq('household_id', widget.householdId)
-            .eq('user_id', supabase.auth.currentUser!.id)
-            .single();
+        final myId = await householdRepository.myMemberId(widget.householdId);
         await recurringTransactionRepository.create(
           householdId: widget.householdId,
           accountId: accountId,
           categoryId: categoryId,
-          createdBy: memberRow['id'] as String,
+          createdBy: myId,
+          ownerMemberId: ownerMemberId,
           type: _type,
           amount: amount,
           intervalRule: _intervalRule,
-          nextRunAt: _nextRunAt,
+          startAt: _startAt,
+          autoRegister: _autoRegister,
           memo: memo,
         );
       } else {
@@ -232,13 +251,12 @@ class _RecurringTransactionFormScreenState extends State<RecurringTransactionFor
           id: existing.id,
           accountId: accountId,
           categoryId: categoryId,
+          ownerMemberId: ownerMemberId,
           type: _type,
           amount: amount,
           intervalRule: _intervalRule,
-          // only write the date back if the user actually changed it — sending
-          // the value this form loaded could roll next_run_at backwards past
-          // occurrences a background catch-up already created
-          nextRunAt: _nextRunAt == existing.nextRunAt ? null : _nextRunAt,
+          startAt: _startAt,
+          autoRegister: _autoRegister,
           memo: memo,
         );
       }
@@ -345,9 +363,21 @@ class _RecurringTransactionFormScreenState extends State<RecurringTransactionFor
               controller: _memoController,
               decoration: const InputDecoration(labelText: '메모(선택)'),
             ),
+            if (_nicknames != null && _nicknames!.isNotEmpty)
+              DropdownButton<String>(
+                value: _ownerMemberId,
+                items: _nicknames!.entries.map((e) => DropdownMenuItem(value: e.key, child: Text('소유자: ${e.value}'))).toList(),
+                onChanged: (v) => setState(() => _ownerMemberId = v),
+              ),
+            SwitchListTile(
+              title: const Text('자동 등록'),
+              subtitle: const Text('꺼두면 "처리할 목록"에서 확인 후 등록해요'),
+              value: _autoRegister,
+              onChanged: (v) => setState(() => _autoRegister = v),
+            ),
             ListTile(
-              title: const Text('시작일(다음 실행일)'),
-              subtitle: Text('${_nextRunAt.year}-${_nextRunAt.month.toString().padLeft(2, '0')}-${_nextRunAt.day.toString().padLeft(2, '0')}'),
+              title: const Text('시작일'),
+              subtitle: Text('${_startAt.year}-${_startAt.month.toString().padLeft(2, '0')}-${_startAt.day.toString().padLeft(2, '0')}'),
               onTap: _pickDate,
             ),
             DropdownButton<_Frequency>(
