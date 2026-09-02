@@ -16,10 +16,12 @@ class RecurringTransactionRepository {
     required String accountId,
     required String categoryId,
     required String createdBy,
+    required String ownerMemberId,
     required String type,
     required int amount,
     required String intervalRule,
-    required DateTime nextRunAt,
+    required DateTime startAt,
+    bool autoRegister = false,
     String? memo,
   }) async {
     final rows = await _client.from('recurring_transactions').insert({
@@ -27,28 +29,35 @@ class RecurringTransactionRepository {
       'account_id': accountId,
       'category_id': categoryId,
       'created_by': createdBy,
+      'owner_member_id': ownerMemberId,
       'type': type,
       'amount': amount,
       'interval_rule': intervalRule,
-      'next_run_at': nextRunAt.toUtc().toIso8601String(),
+      'start_at': startAt.toUtc().toIso8601String(),
+      'auto_register': autoRegister,
       'memo': memo,
     }).select();
     return RecurringTransaction.fromJson(rows.first);
   }
 
-  /// Updates an existing template. [nextRunAt] is optional and the key is
-  /// omitted from the payload entirely when null — an edit form that didn't
-  /// touch the date must NOT write back the (possibly stale) value it loaded,
-  /// or it would roll the schedule backwards past occurrences an in-flight
-  /// catch-up already created, and the next catch-up would replay them all.
+  /// Updates an existing template. Unlike the old `next_run_at`-based
+  /// design, `start_at` is a fixed calculation anchor, not a pointer another
+  /// session might be mid-advancing — "done" is now derived from whether a
+  /// matching transaction exists (the unique index from migration 0011),
+  /// not from this column. Moving it can only change which future dates get
+  /// computed as due; it can never resurrect or duplicate a past occurrence.
+  /// So unlike the old `update()`, `startAt` is a plain required field here
+  /// — no CAS, no optional-omit-when-unchanged dance needed.
   Future<RecurringTransaction> update({
     required String id,
     required String accountId,
     required String categoryId,
+    required String ownerMemberId,
     required String type,
     required int amount,
     required String intervalRule,
-    DateTime? nextRunAt,
+    required DateTime startAt,
+    required bool autoRegister,
     String? memo,
   }) async {
     final rows = await _client
@@ -56,10 +65,12 @@ class RecurringTransactionRepository {
         .update({
           'account_id': accountId,
           'category_id': categoryId,
+          'owner_member_id': ownerMemberId,
           'type': type,
           'amount': amount,
           'interval_rule': intervalRule,
-          if (nextRunAt != null) 'next_run_at': nextRunAt.toUtc().toIso8601String(),
+          'start_at': startAt.toUtc().toIso8601String(),
+          'auto_register': autoRegister,
           'memo': memo,
         })
         .eq('id', id)
@@ -69,28 +80,5 @@ class RecurringTransactionRepository {
 
   Future<void> delete(String id) async {
     await _client.from('recurring_transactions').delete().eq('id', id);
-  }
-
-  /// Advances only `next_run_at`, leaving every other field untouched — used
-  /// by the catch-up service after each occurrence it successfully creates.
-  /// This is a compare-and-swap: the update only applies if `next_run_at`
-  /// still equals [expectedCurrentNextRunAt] (the value this caller last
-  /// read). Returns whether the swap succeeded. If it returns false, another
-  /// session already advanced this template past this point — the caller
-  /// must stop processing this template rather than keep going, or it would
-  /// create further duplicate transactions on top of the one already made
-  /// for the occurrence that just triggered this call.
-  Future<bool> advanceNextRunAt(
-    String id,
-    DateTime nextRunAt, {
-    required DateTime expectedCurrentNextRunAt,
-  }) async {
-    final rows = await _client
-        .from('recurring_transactions')
-        .update({'next_run_at': nextRunAt.toUtc().toIso8601String()})
-        .eq('id', id)
-        .eq('next_run_at', expectedCurrentNextRunAt.toUtc().toIso8601String())
-        .select();
-    return rows.isNotEmpty;
   }
 }
