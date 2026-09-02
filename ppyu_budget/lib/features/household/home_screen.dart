@@ -7,11 +7,10 @@ import 'package:ppyu_budget/features/ledger/account_screen.dart';
 import 'package:ppyu_budget/features/ledger/budget_screen.dart';
 import 'package:ppyu_budget/features/ledger/category_screen.dart';
 import 'package:ppyu_budget/features/ledger/recurring_transaction_catchup_service.dart' show recurringTransactionCatchUpService;
-import 'package:ppyu_budget/features/ledger/recurring_transaction_screen.dart';
+import 'package:ppyu_budget/features/household/auto_registration_menu_screen.dart';
 import 'package:ppyu_budget/features/ledger/savings_goal_screen.dart';
 import 'package:ppyu_budget/features/ledger/tag_management_screen.dart';
 import 'package:ppyu_budget/features/ledger/transaction_list_screen.dart';
-import 'package:ppyu_budget/features/notification_capture/notification_onboarding_screen.dart';
 import 'package:ppyu_budget/features/stats/models/spending_recommendation.dart';
 import 'package:ppyu_budget/features/stats/stats_screen.dart' show StatsScreen, statsRepository;
 
@@ -219,21 +218,15 @@ class _HomeScreenState extends State<HomeScreen> {
               )),
             ),
             ListTile(
-              title: const Text('반복거래 관리'),
+              title: const Text('자동거래등록'),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => RecurringTransactionListScreen(householdId: householdId),
+                builder: (_) => AutoRegistrationMenuScreen(householdId: householdId),
               )),
             ),
             ListTile(
               title: const Text('저축 목표'),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => SavingsGoalScreen(householdId: householdId),
-              )),
-            ),
-            ListTile(
-              title: const Text('결제 알림 자동인식 설정'),
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => const NotificationOnboardingScreen(),
               )),
             ),
           ],
