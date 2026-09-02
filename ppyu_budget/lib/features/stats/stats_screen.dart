@@ -73,7 +73,7 @@ class _StatsScreenState extends State<StatsScreen> {
   Future<void> _exportCsv() async {
     setState(() => _exporting = true);
     try {
-      final allTransactions = await transactionRepository.list(widget.householdId);
+      final allTransactions = await transactionRepository.list(widget.householdId, confirmed: true);
       final monthTransactions = allTransactions
           .where((t) =>
               t.occurredAt.toLocal().year == _month.year &&
