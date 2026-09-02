@@ -247,6 +247,25 @@ class _RecurringTransactionFormScreenState extends State<RecurringTransactionFor
           memo: memo,
         );
       } else {
+        // Changing the schedule of an auto-registering template shifts every
+        // future occurrence onto dates that don't exist yet, so the next
+        // catch-up run silently back-fills them — looks like a duplicate
+        // charge to the user. The unique index can't catch this (the new
+        // dates are genuinely new), so ask first.
+        if (_autoRegister && (_startAt != existing.startAt || _intervalRule != existing.intervalRule)) {
+          final proceed = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('일정 변경 확인'),
+              content: const Text('시작일이나 반복 주기를 바꾸면, 자동 등록 템플릿이 새 일정 기준으로 지난 거래를 다시 만들 수 있어요. 계속할까요?'),
+              actions: [
+                TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('취소')),
+                TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('계속')),
+              ],
+            ),
+          );
+          if (proceed != true) return; // finally clears _saving
+        }
         await recurringTransactionRepository.update(
           id: existing.id,
           accountId: accountId,
