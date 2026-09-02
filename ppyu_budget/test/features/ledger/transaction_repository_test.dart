@@ -77,6 +77,7 @@ void main() {
       'memo': '커피',
       'merchant': null,
       'source': 'manual',
+      'confirmed': true,
     });
     request.response
       ..statusCode = HttpStatus.created
@@ -125,6 +126,7 @@ void main() {
       'memo': null,
       'merchant': '스타벅스',
       'source': 'notification_auto',
+      'confirmed': true,
     });
     request.response
       ..statusCode = HttpStatus.created

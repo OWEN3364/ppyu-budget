@@ -6,12 +6,15 @@ class TransactionRepository {
 
   final SupabaseClient _client;
 
-  Future<List<LedgerTransaction>> list(String householdId) async {
-    final rows = await _client
+  Future<List<LedgerTransaction>> list(String householdId, {bool? confirmed}) async {
+    var query = _client
         .from('transactions')
         .select('*, transaction_tags(tag_id)')
-        .eq('household_id', householdId)
-        .order('occurred_at', ascending: false);
+        .eq('household_id', householdId);
+    if (confirmed != null) {
+      query = query.eq('confirmed', confirmed);
+    }
+    final rows = await query.order('occurred_at', ascending: false);
     return rows.map(LedgerTransaction.fromJson).toList();
   }
 
@@ -27,6 +30,8 @@ class TransactionRepository {
     String source = 'manual',
     List<String> tagIds = const [],
     DateTime? occurredAt,
+    String? recurringTransactionId,
+    bool confirmed = true,
   }) async {
     final rows = await _client.from('transactions').insert({
       'household_id': householdId,
@@ -38,7 +43,9 @@ class TransactionRepository {
       'memo': memo,
       'merchant': merchant,
       'source': source,
+      'confirmed': confirmed,
       if (occurredAt != null) 'occurred_at': occurredAt.toUtc().toIso8601String(),
+      if (recurringTransactionId != null) 'recurring_transaction_id': recurringTransactionId,
     }).select();
     final transaction = LedgerTransaction.fromJson(rows.first);
     // a brand-new row can't have existing tags, so there's nothing to clear —
@@ -88,5 +95,20 @@ class TransactionRepository {
 
   Future<void> delete(String id) async {
     await _client.from('transactions').delete().eq('id', id);
+  }
+
+  /// Flips a notification-capture "확인 후 저장" pending transaction to confirmed.
+  Future<void> confirm(String id) async {
+    await _client.from('transactions').update({'confirmed': true}).eq('id', id);
+  }
+
+  /// Every `occurred_at` already recorded for [recurringTransactionId] —
+  /// used by `missingOccurrences` to compute what's still due.
+  Future<Set<DateTime>> occurredAtsForRecurringTransaction(String recurringTransactionId) async {
+    final rows = await _client
+        .from('transactions')
+        .select('occurred_at')
+        .eq('recurring_transaction_id', recurringTransactionId);
+    return rows.map((r) => DateTime.parse(r['occurred_at'] as String)).toSet();
   }
 }
