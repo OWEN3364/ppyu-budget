@@ -87,7 +87,11 @@ class _RecurringTransactionTodoScreenState extends State<RecurringTransactionTod
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = '처리할 목록을 불러오지 못했어요');
+      setState(() {
+        _error = '처리할 목록을 불러오지 못했어요';
+        _mine = const [];
+        _spouse = const [];
+      });
     }
   }
 
