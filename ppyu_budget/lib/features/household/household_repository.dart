@@ -38,6 +38,20 @@ class HouseholdRepository {
     });
   }
 
+  /// The caller's own household_members.id within [householdId] — used
+  /// wherever code needs to know "which member is me" (e.g. defaulting a
+  /// new recurring-transaction template's owner, or splitting the
+  /// recurring-transaction todo list into "나"/"배우자").
+  Future<String> myMemberId(String householdId) async {
+    final row = await _client
+        .from('household_members')
+        .select('id')
+        .eq('household_id', householdId)
+        .eq('user_id', _client.auth.currentUser!.id)
+        .single();
+    return row['id'] as String;
+  }
+
   Future<Map<String, String>> nicknamesByMemberId(String householdId) async {
     final rows = await _client
         .from('household_members')
