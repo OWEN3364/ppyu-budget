@@ -97,6 +97,25 @@ void main() {
       expect(missing, hasLength(maxCatchUpOccurrences));
       expect(missing.last, DateTime(2026, 1, 1).add(Duration(days: maxCatchUpOccurrences - 1)));
     });
+
+    test('finds occurrences beyond the cap-worth of already-matched history (regression: cap must bound MISSING occurrences, not examined ones)', () {
+      // A DAILY template with 100 days of history, days 0-99 ALL already
+      // matched (real transactions exist) — under the old "examined" cap
+      // semantics, the walk would exhaust its 60-count budget entirely inside
+      // this matched prefix and never reach the genuinely missing days 100+.
+      final startAt = DateTime(2026, 1, 1);
+      final template = _template(startAt: startAt, intervalRule: 'DAILY');
+      final matchedPrefix = List.generate(100, (i) => startAt.add(Duration(days: i))).toSet();
+      final now = startAt.add(const Duration(days: 150));
+
+      final missing = missingOccurrences(template, now: now, existingOccurredAt: matchedPrefix);
+
+      // Days 100 through 150 inclusive = 51 genuinely missing days — well
+      // under the cap, so all of them must be found.
+      expect(missing, hasLength(51));
+      expect(missing.first, startAt.add(const Duration(days: 100)));
+      expect(missing.last, startAt.add(const Duration(days: 150)));
+    });
   });
 }
 

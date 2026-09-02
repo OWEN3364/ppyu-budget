@@ -31,6 +31,13 @@ DateTime advanceOccurrence(String intervalRule, DateTime from) {
     // days into the next month. DateTime's constructor does this rollover
     // on its own (e.g. day=31 in a 30-day month becomes the 1st of the
     // month after), so no extra guard is needed here.
+    //
+    // The rollover is NOT self-correcting on later months either: each step
+    // is computed from the PREVIOUS computed occurrence, not from the
+    // original anchor day, so Jan 31 -> Mar 3 -> Apr 3 -> May 3 -> ...
+    // permanently drifts to the 3rd rather than ever returning to the 31st.
+    // Deliberate: a stable (if drifted) date is easier to reason about than
+    // a date that keeps snapping back and forth month to month.
     return DateTime(from.year, from.month + 1, from.day, from.hour, from.minute);
   }
 
@@ -53,11 +60,18 @@ DateTime advanceOccurrence(String intervalRule, DateTime from) {
 /// `.toLocal()`-converted depending on which caller read it, and comparing
 /// raw DateTime values could silently miss a real match.
 ///
-/// ponytail: capped at [maxCatchUpOccurrences] occurrences EXAMINED per
-/// call — the same cap that bounds silent auto-creation also bounds how far
-/// back the todo screen walks per template per load. Raise it (or split
-/// into a separate, todo-specific constant) only if a real household's
-/// overdue backlog is ever big enough to hit it in practice.
+/// ponytail: capped at [maxCatchUpOccurrences] occurrences RETURNED (i.e.
+/// actually missing) per call — the same cap that bounds silent
+/// auto-creation also bounds how far back the todo screen walks per
+/// template per load. Corrected during final review: the cap used to count
+/// occurrences EXAMINED, which silently became a per-template LIFETIME
+/// ceiling once `start_at` stopped being an advancing pointer — the walk
+/// always restarts at the fixed anchor, so after 60 dates had been examined
+/// (matched or not) the template could never produce anything again.
+/// Walking a long already-matched prefix is cheap pure in-memory iteration
+/// — no I/O — so bounding created work, not examined work, is the right
+/// guarantee. Raise the cap (or split into a separate, todo-specific
+/// constant) only if a real household's overdue backlog ever hits it.
 List<DateTime> missingOccurrences(
   RecurringTransaction template, {
   required DateTime now,
@@ -66,12 +80,10 @@ List<DateTime> missingOccurrences(
   final existingUtc = existingOccurredAt.map((d) => d.toUtc()).toSet();
   final missing = <DateTime>[];
   var cursor = template.startAt;
-  var visited = 0;
-  while (!cursor.isAfter(now) && visited < maxCatchUpOccurrences) {
+  while (!cursor.isAfter(now) && missing.length < maxCatchUpOccurrences) {
     if (!existingUtc.contains(cursor.toUtc())) {
       missing.add(cursor);
     }
-    visited++;
     cursor = advanceOccurrence(template.intervalRule, cursor);
   }
   return missing;
