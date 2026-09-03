@@ -10,7 +10,10 @@ import 'package:ppyu_budget/features/ledger/recurring_transaction_catchup_servic
 import 'package:ppyu_budget/features/household/auto_registration_menu_screen.dart';
 import 'package:ppyu_budget/features/ledger/savings_goal_screen.dart';
 import 'package:ppyu_budget/features/ledger/tag_management_screen.dart';
+import 'package:ppyu_budget/features/ledger/transaction_form_screen.dart' show transactionRepository;
 import 'package:ppyu_budget/features/ledger/transaction_list_screen.dart';
+import 'package:ppyu_budget/features/notification_capture/notification_auto_save_service.dart';
+import 'package:ppyu_budget/features/notification_capture/notification_onboarding_screen.dart' show notificationCaptureService;
 import 'package:ppyu_budget/features/stats/models/spending_recommendation.dart';
 import 'package:ppyu_budget/features/stats/stats_screen.dart' show StatsScreen, statsRepository;
 
@@ -39,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _householdId;
   String? _error;
   Future<List<SpendingRecommendation>>? _recommendationsFuture;
+  NotificationAutoSaveService? _notificationAutoSaveService;
 
   @override
   void initState() {
@@ -48,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _notificationAutoSaveService?.stop();
     _nicknameController.dispose();
     super.dispose();
   }
@@ -62,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     if (householdId != null) {
       _runCatchUp(householdId);
+      _startNotificationAutoSave(householdId);
     }
   }
 
@@ -74,6 +80,30 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } catch (_) {
       // 조용히 무시 — 다음 홈 화면 진입 때 다시 시도된다.
+    }
+  }
+
+  // _loadHousehold()가 초대/합류 이후 재호출될 수 있으므로, 이미 시작된
+  // 서비스가 있으면 다시 만들지 않는다 — 그렇지 않으면 알림마다 두 번씩
+  // 처리(중복 거래 생성)될 수 있다.
+  Future<void> _startNotificationAutoSave(String householdId) async {
+    if (_notificationAutoSaveService != null) return;
+    try {
+      final granted = await notificationCaptureService.isAccessGranted();
+      if (!granted || !mounted) return;
+      final memberId = await householdRepository.myMemberId(householdId);
+      if (!mounted) return;
+      _notificationAutoSaveService = NotificationAutoSaveService(
+        notifications: notificationCaptureService.notifications,
+        householdId: householdId,
+        memberId: memberId,
+        accountRepository: accountRepository,
+        categoryRepository: categoryRepository,
+        transactionRepository: transactionRepository,
+      )..start();
+    } catch (_) {
+      // 조용히 무시 — 다음 홈 화면 진입 때 다시 시도된다 (권한이 아직
+      // 없는 게 정상 상태이므로 사용자에게 에러를 보여줄 필요는 없다).
     }
   }
 
