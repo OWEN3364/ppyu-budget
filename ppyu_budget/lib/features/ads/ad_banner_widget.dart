@@ -3,6 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+/// The banner's rendered height, in logical pixels. Screens with a
+/// FloatingActionButton need this to lift the FAB clear of the banner —
+/// the banner is mounted below every Scaffold via MaterialApp's `builder`,
+/// so no individual Scaffold knows it's there on its own.
+final double adBannerHeight = AdSize.banner.height.toDouble();
+
 /// A fixed-size (320x50) banner ad, meant to sit at the bottom of every
 /// screen via MaterialApp's `builder`. Renders nothing until the ad has
 /// actually loaded (AdWidget requires a loaded ad before it's mounted —

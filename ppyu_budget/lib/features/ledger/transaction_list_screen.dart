@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ppyu_budget/features/ads/ad_banner_widget.dart' show adBannerHeight;
 import 'package:ppyu_budget/features/household/invite_screen.dart' show householdRepository;
 import 'package:ppyu_budget/features/ledger/models/tag.dart';
 import 'package:ppyu_budget/features/ledger/models/transaction.dart';
@@ -94,14 +95,18 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
         : filterTransactions(transactions, _query, _selectedTagIds);
     return Scaffold(
       appBar: AppBar(title: const Text('거래 내역')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => TransactionFormScreen(householdId: widget.householdId),
-          ));
-          _load();
-        },
-        child: const Icon(Icons.add),
+      floatingActionButton: Padding(
+        // 화면 하단 고정 광고 배너(전역 배선, 이 Scaffold는 모름) 위로 FAB를 밀어올림.
+        padding: EdgeInsets.only(bottom: adBannerHeight),
+        child: FloatingActionButton(
+          onPressed: () async {
+            await Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => TransactionFormScreen(householdId: widget.householdId),
+            ));
+            _load();
+          },
+          child: const Icon(Icons.add),
+        ),
       ),
       body: Column(
         children: [

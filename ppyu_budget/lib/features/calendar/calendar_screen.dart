@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:ppyu_budget/features/ads/ad_banner_widget.dart' show adBannerHeight;
 import 'package:ppyu_budget/features/calendar/calendar_event_form_screen.dart' show CalendarEventFormScreen, calendarEventRepository;
 import 'package:ppyu_budget/features/calendar/models/calendar_event.dart';
 import 'package:ppyu_budget/features/calendar/recurrence.dart';
@@ -65,17 +66,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final selectedDay = _selectedDay;
     return Scaffold(
       appBar: AppBar(title: const Text('캘린더')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => CalendarEventFormScreen(
-              householdId: widget.householdId,
-              initialDate: selectedDay ?? _focusedDay,
-            ),
-          ));
-          _load();
-        },
-        child: const Icon(Icons.add),
+      floatingActionButton: Padding(
+        // 화면 하단 고정 광고 배너(전역 배선, 이 Scaffold는 모름) 위로 FAB를 밀어올림.
+        padding: EdgeInsets.only(bottom: adBannerHeight),
+        child: FloatingActionButton(
+          onPressed: () async {
+            await Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => CalendarEventFormScreen(
+                householdId: widget.householdId,
+                initialDate: selectedDay ?? _focusedDay,
+              ),
+            ));
+            _load();
+          },
+          child: const Icon(Icons.add),
+        ),
       ),
       body: Column(
         children: [
