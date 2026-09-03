@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:ppyu_budget/core/app_fonts.dart';
 import 'package:ppyu_budget/core/supabase_client.dart';
 import 'package:ppyu_budget/features/ads/ad_banner_widget.dart';
 import 'package:ppyu_budget/features/auth/login_screen.dart';
@@ -64,6 +65,9 @@ class _PpyuAppState extends State<PpyuApp> {
     return MaterialApp(
       navigatorKey: _navigatorKey,
       title: '쀼가계부',
+      // 다이어리 컨셉의 메인 손글씨. 색상 테마는 아직 확정 전이라 손대지
+      // 않음 — 팔레트가 정해지면 여기 colorScheme도 같이 채운다.
+      theme: ThemeData(fontFamily: AppFonts.main.family),
       builder: (context, child) => Column(
         children: [
           Expanded(
