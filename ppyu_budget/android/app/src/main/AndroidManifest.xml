@@ -43,6 +43,12 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- AdMob: 구글 공식 테스트 App ID. 실제 계정 발급 후 교체
+             (docs/superpowers/specs/2026-09-03-admob-banner-design.md 참고). -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713" />
+
         <!-- notification_listener_service: binds our app to Android's
              NotificationListenerService so it can observe system notifications
              (bank/card/Samsung Pay alerts) once the user grants notification
