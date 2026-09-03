@@ -17,12 +17,14 @@ void main() async {
     url: dotenv.env['SUPABASE_URL']!,
     anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
-  try {
-    await MobileAds.instance.initialize();
-  } catch (e) {
-    // 광고 SDK 초기화 실패가 앱 시작 자체를 막으면 안 됨 — 배너는 optional.
+  // await 하지 않음 — initialize()는 네이티브 SDK의 onInitializationComplete
+  // 콜백(어댑터 설정 + 네트워크 I/O)이 끝나야 완료되므로, await 하면 느린 네트워크가
+  // 첫 프레임 전체를 막는다. BannerAd.load()는 initialize() 완료 여부와 무관하게
+  // 네이티브에서 큐잉되므로 기다릴 이유가 없다 — fire-and-forget.
+  MobileAds.instance.initialize().catchError((Object e) {
     debugPrint('AdMob 초기화 실패: $e');
-  }
+    return InitializationStatus({});
+  });
   runApp(const PpyuApp());
 }
 
@@ -64,7 +66,13 @@ class _PpyuAppState extends State<PpyuApp> {
       title: '쀼가계부',
       builder: (context, child) => Column(
         children: [
-          Expanded(child: child ?? const SizedBox.shrink()),
+          Expanded(
+            child: MediaQuery.removePadding(
+              context: context,
+              removeBottom: true,
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
           const AdBannerWidget(),
         ],
       ),
