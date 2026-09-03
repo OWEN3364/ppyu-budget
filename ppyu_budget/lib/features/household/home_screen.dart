@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ppyu_budget/core/highlight.dart';
 import 'package:ppyu_budget/features/calendar/calendar_screen.dart';
 import 'package:ppyu_budget/features/household/household_repository.dart';
 import 'package:ppyu_budget/features/household/invite_screen.dart';
@@ -190,7 +191,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   margin: const EdgeInsets.all(8),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Text('${recs.first.categoryName} 지출이 전월 대비 ${recs.first.changeRatio.toStringAsFixed(0)}% 늘었어요'),
+                    child: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Highlight(child: Text(recs.first.categoryName)),
+                        Text(' 지출이 전월 대비 ${recs.first.changeRatio.toStringAsFixed(0)}% 늘었어요'),
+                      ],
+                    ),
                   ),
                 );
               },
