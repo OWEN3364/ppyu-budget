@@ -335,4 +335,144 @@ begin
 end $$;
 rollback to savepoint sp10;
 
+-- UPDATE-side negative cases: the with check clause text is identical
+-- between each table's insert and update policy, but the update path
+-- itself was untested until now (one representative column per table is
+-- enough — the insert scenarios above already covered every column
+-- individually).
+
+-- accounts: update rejects a cross-household owner_member_id
+savepoint sp11;
+do $$
+declare
+  v_household_a uuid;
+  v_household_b uuid;
+  v_member_b uuid;
+  v_account_id uuid;
+  v_raised boolean := false;
+begin
+  perform set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+  v_household_b := create_household_and_owner();
+  select id into v_member_b from household_members where household_id = v_household_b and user_id = auth.uid();
+
+  perform set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111"}', true);
+  v_household_a := create_household_and_owner();
+  insert into accounts (household_id, name) values (v_household_a, '내 카드') returning id into v_account_id;
+
+  begin
+    update accounts set owner_member_id = v_member_b where id = v_account_id;
+  exception when others then
+    v_raised := true;
+  end;
+  if not v_raised then
+    raise exception 'TEST FAILED: account update setting owner_member_id to a cross-household member was allowed';
+  end if;
+end $$;
+rollback to savepoint sp11;
+
+-- budgets: update rejects a cross-household category_id
+savepoint sp12;
+do $$
+declare
+  v_household_a uuid;
+  v_household_b uuid;
+  v_category_b uuid;
+  v_budget_id uuid;
+  v_raised boolean := false;
+begin
+  perform set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+  v_household_b := create_household_and_owner();
+  select id into v_category_b from categories where household_id = v_household_b and type = 'expense' limit 1;
+
+  perform set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111"}', true);
+  v_household_a := create_household_and_owner();
+  insert into budgets (household_id, category_id, month, amount) values (v_household_a, null, '2026-09-01', 500000) returning id into v_budget_id;
+
+  begin
+    update budgets set category_id = v_category_b where id = v_budget_id;
+  exception when others then
+    v_raised := true;
+  end;
+  if not v_raised then
+    raise exception 'TEST FAILED: budget update setting category_id to a cross-household category was allowed';
+  end if;
+end $$;
+rollback to savepoint sp12;
+
+-- transactions: update rejects a cross-household account_id
+savepoint sp13;
+do $$
+declare
+  v_household_a uuid;
+  v_household_b uuid;
+  v_member_a uuid;
+  v_account_a uuid;
+  v_account_b uuid;
+  v_category_a uuid;
+  v_txn_id uuid;
+  v_raised boolean := false;
+begin
+  perform set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+  v_household_b := create_household_and_owner();
+  insert into accounts (household_id, name) values (v_household_b, '남의 카드') returning id into v_account_b;
+
+  perform set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111"}', true);
+  v_household_a := create_household_and_owner();
+  select id into v_member_a from household_members where household_id = v_household_a and user_id = auth.uid();
+  insert into accounts (household_id, name) values (v_household_a, '내 카드') returning id into v_account_a;
+  select id into v_category_a from categories where household_id = v_household_a and type = 'expense' limit 1;
+
+  insert into transactions (household_id, account_id, category_id, member_id, type, amount)
+  values (v_household_a, v_account_a, v_category_a, v_member_a, 'expense', 1000)
+  returning id into v_txn_id;
+
+  begin
+    update transactions set account_id = v_account_b where id = v_txn_id;
+  exception when others then
+    v_raised := true;
+  end;
+  if not v_raised then
+    raise exception 'TEST FAILED: transaction update setting account_id to a cross-household account was allowed';
+  end if;
+end $$;
+rollback to savepoint sp13;
+
+-- recurring_transactions: update rejects a cross-household account_id
+savepoint sp14;
+do $$
+declare
+  v_household_a uuid;
+  v_household_b uuid;
+  v_member_a uuid;
+  v_account_a uuid;
+  v_account_b uuid;
+  v_category_a uuid;
+  v_template_id uuid;
+  v_raised boolean := false;
+begin
+  perform set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+  v_household_b := create_household_and_owner();
+  insert into accounts (household_id, name) values (v_household_b, '남의 카드') returning id into v_account_b;
+
+  perform set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111"}', true);
+  v_household_a := create_household_and_owner();
+  select id into v_member_a from household_members where household_id = v_household_a and user_id = auth.uid();
+  insert into accounts (household_id, name) values (v_household_a, '내 카드') returning id into v_account_a;
+  select id into v_category_a from categories where household_id = v_household_a and type = 'expense' limit 1;
+
+  insert into recurring_transactions (household_id, account_id, category_id, created_by, owner_member_id, type, amount, interval_rule, start_at)
+  values (v_household_a, v_account_a, v_category_a, v_member_a, v_member_a, 'expense', 1000, 'MONTHLY', now())
+  returning id into v_template_id;
+
+  begin
+    update recurring_transactions set account_id = v_account_b where id = v_template_id;
+  exception when others then
+    v_raised := true;
+  end;
+  if not v_raised then
+    raise exception 'TEST FAILED: recurring_transactions update setting account_id to a cross-household account was allowed';
+  end if;
+end $$;
+rollback to savepoint sp14;
+
 rollback;
