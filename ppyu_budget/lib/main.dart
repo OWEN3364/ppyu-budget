@@ -2,8 +2,10 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ppyu_budget/core/supabase_client.dart';
+import 'package:ppyu_budget/features/ads/ad_banner_widget.dart';
 import 'package:ppyu_budget/features/auth/login_screen.dart';
 import 'package:ppyu_budget/features/household/home_screen.dart';
 import 'package:ppyu_budget/features/household/join_screen.dart';
@@ -15,6 +17,12 @@ void main() async {
     url: dotenv.env['SUPABASE_URL']!,
     anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
+  try {
+    await MobileAds.instance.initialize();
+  } catch (e) {
+    // 광고 SDK 초기화 실패가 앱 시작 자체를 막으면 안 됨 — 배너는 optional.
+    debugPrint('AdMob 초기화 실패: $e');
+  }
   runApp(const PpyuApp());
 }
 
@@ -54,6 +62,12 @@ class _PpyuAppState extends State<PpyuApp> {
     return MaterialApp(
       navigatorKey: _navigatorKey,
       title: '쀼가계부',
+      builder: (context, child) => Column(
+        children: [
+          Expanded(child: child ?? const SizedBox.shrink()),
+          const AdBannerWidget(),
+        ],
+      ),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,

@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ppyu_budget/main.dart';
@@ -7,6 +8,10 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
+    // main() normally loads .env before PpyuApp is built; this test builds
+    // PpyuApp directly, so AdBannerWidget would otherwise hit dotenv before
+    // it's ever initialized. Load an empty env so its null-guard applies.
+    dotenv.loadFromString(isOptional: true);
     // Mock the shared_preferences platform channel so Supabase.initialize
     // doesn't hit a real platform channel in the unit test environment.
     const platform = MethodChannel('plugins.flutter.io/shared_preferences');
