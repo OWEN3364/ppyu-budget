@@ -1,3 +1,4 @@
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:ppyu_budget/features/ads/ad_banner_widget.dart' show adBannerHeight;
@@ -84,7 +85,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
       body: Column(
         children: [
-          if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+          if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.error)),
           if (_events == null)
             const Expanded(child: Center(child: CircularProgressIndicator()))
           else ...[

@@ -15,6 +15,28 @@ class AppColors {
 
   /// 본문 텍스트 — 순검정 대신 부드러운 다크그레이.
   static const ink = Color(0xFF444444);
+
+  /// 부가 설명/보조 텍스트.
+  static const muted = Color(0xFF8A8A8A);
+
+  /// 에러 메시지.
+  static const error = Colors.red;
+
+  /// 형광펜 강조.
+  static const highlight = Color(0xFFFFE08A);
+
+  /// 통계 차트에서 카테고리를 구분하는 색상들 (브랜드 팔레트와 별개로,
+  /// 서로 뚜렷이 구분되는 색 8개가 필요해서 유지).
+  static const chartColors = [
+    Colors.blue,
+    Colors.red,
+    Colors.green,
+    Colors.orange,
+    Colors.purple,
+    Colors.teal,
+    Colors.brown,
+    Colors.pink,
+  ];
 }
 
 class AppTheme {

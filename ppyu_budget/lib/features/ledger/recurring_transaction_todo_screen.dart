@@ -1,3 +1,4 @@
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import 'package:ppyu_budget/features/household/invite_screen.dart' show householdRepository;
@@ -156,7 +157,7 @@ class _RecurringTransactionTodoScreenState extends State<RecurringTransactionTod
     return Column(
       children: [
         TabBar(controller: _tabController, tabs: const [Tab(text: '나'), Tab(text: '배우자')]),
-        if (_error != null) Padding(padding: const EdgeInsets.all(8), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        if (_error != null) Padding(padding: const EdgeInsets.all(8), child: Text(_error!, style: const TextStyle(color: AppColors.error))),
         Expanded(
           child: TabBarView(controller: _tabController, children: [_list(_mine), _list(_spouse)]),
         ),

@@ -1,3 +1,4 @@
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/core/supabase_client.dart';
 import 'package:ppyu_budget/features/ledger/account_screen.dart' show accountRepository;
@@ -115,7 +116,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       return Scaffold(
         appBar: AppBar(title: const Text('거래 추가')),
         body: _error != null
-            ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+            ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.error)))
             : const Center(child: CircularProgressIndicator()),
       );
     }
@@ -179,7 +180,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
               controller: _memoController,
               decoration: const InputDecoration(labelText: '메모(선택)'),
             ),
-            if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+            if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.error)),
             ElevatedButton(
               onPressed: _saving ? null : _save,
               child: const Text('저장'),

@@ -51,3 +51,6 @@ app.*.map.json
 .widget_preview/
 
 .env
+
+# superpowers brainstorming scratch (visual companion state, no longer used)
+.superpowers/

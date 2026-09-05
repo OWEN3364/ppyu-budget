@@ -1,3 +1,4 @@
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/core/supabase_client.dart';
 import 'package:ppyu_budget/features/ledger/tag_repository.dart';
@@ -100,7 +101,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       appBar: AppBar(title: const Text('태그 관리')),
       body: Column(
         children: [
-          if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+          if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.error)),
           Expanded(
             child: tags == null
                 ? const Center(child: CircularProgressIndicator())

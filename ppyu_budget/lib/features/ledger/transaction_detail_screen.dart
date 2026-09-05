@@ -1,3 +1,4 @@
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/features/ledger/account_screen.dart' show accountRepository;
 import 'package:ppyu_budget/features/ledger/category_screen.dart' show categoryRepository;
@@ -142,7 +143,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
       return Scaffold(
         appBar: AppBar(title: const Text('거래 상세')),
         body: _error != null
-            ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+            ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.error)))
             : const Center(child: CircularProgressIndicator()),
       );
     }
@@ -162,7 +163,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
           children: [
             if (widget.transaction.source == 'notification_auto')
               const Text('알림에서 자동으로 채워졌어요. 틀린 부분이 있으면 고쳐주세요.',
-                  style: TextStyle(color: Colors.grey)),
+                  style: TextStyle(color: AppColors.muted)),
             DropdownButton<String>(
               value: _type,
               items: const [
@@ -221,7 +222,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               controller: _memoController,
               decoration: const InputDecoration(labelText: '메모(선택)'),
             ),
-            if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+            if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.error)),
             ElevatedButton(
               onPressed: _saving ? null : _save,
               child: const Text('저장'),

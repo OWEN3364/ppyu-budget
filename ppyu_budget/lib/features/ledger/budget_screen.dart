@@ -1,3 +1,4 @@
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/core/supabase_client.dart';
 import 'package:ppyu_budget/features/ledger/budget_repository.dart';
@@ -86,7 +87,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       return Scaffold(
         appBar: AppBar(title: const Text('이번 달 예산')),
         body: _error != null
-            ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+            ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.error)))
             : const Center(child: CircularProgressIndicator()),
       );
     }
@@ -94,7 +95,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       appBar: AppBar(title: const Text('이번 달 예산')),
       body: Column(
         children: [
-          if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+          if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.error)),
           Expanded(
             child: ListView.builder(
               itemCount: budgets.length,

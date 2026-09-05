@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:ppyu_budget/core/supabase_client.dart';
 import 'package:ppyu_budget/features/ledger/account_screen.dart' show accountRepository;
 import 'package:ppyu_budget/features/ledger/category_screen.dart' show categoryRepository;
@@ -16,10 +17,7 @@ import 'package:ppyu_budget/features/stats/stats_repository.dart';
 
 final statsRepository = StatsRepository(client: supabase);
 
-const _chartColors = [
-  Colors.blue, Colors.red, Colors.green, Colors.orange,
-  Colors.purple, Colors.teal, Colors.brown, Colors.pink,
-];
+const _chartColors = AppColors.chartColors;
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key, required this.householdId});
@@ -138,7 +136,7 @@ class _StatsScreenState extends State<StatsScreen> {
               ),
             ),
           ),
-          if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+          if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.error)),
           if (summary == null)
             const Expanded(child: Center(child: CircularProgressIndicator()))
           else if (expenseCategories.isEmpty)

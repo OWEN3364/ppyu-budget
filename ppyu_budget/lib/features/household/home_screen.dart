@@ -1,3 +1,4 @@
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/core/highlight.dart';
 import 'package:ppyu_budget/features/calendar/calendar_screen.dart';
@@ -290,7 +291,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const Text('초대 코드로 연동하기'),
             ),
             if (_error != null)
-              Text(_error!, style: const TextStyle(color: Colors.red)),
+              Text(_error!, style: const TextStyle(color: AppColors.error)),
 ],
         ),
       ),

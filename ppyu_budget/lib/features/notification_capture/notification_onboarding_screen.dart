@@ -1,3 +1,4 @@
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/features/notification_capture/notification_capture_service.dart';
 import 'package:ppyu_budget/features/notification_capture/notification_pending_screen.dart';
@@ -116,7 +117,7 @@ class _NotificationOnboardingScreenState extends State<NotificationOnboardingScr
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                child: Text(_error!, style: const TextStyle(color: AppColors.error)),
               ),
             const SizedBox(height: 24),
             SwitchListTile(

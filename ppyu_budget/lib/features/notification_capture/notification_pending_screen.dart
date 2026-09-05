@@ -1,3 +1,4 @@
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/features/ledger/models/transaction.dart';
 import 'package:ppyu_budget/features/ledger/transaction_form_screen.dart' show transactionRepository;
@@ -51,7 +52,7 @@ class _NotificationPendingScreenState extends State<NotificationPendingScreen> {
       appBar: AppBar(title: const Text('자동인식 거래 확인')),
       body: Column(
         children: [
-          if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+          if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.error)),
           Expanded(
             child: pending == null
                 ? const Center(child: CircularProgressIndicator())

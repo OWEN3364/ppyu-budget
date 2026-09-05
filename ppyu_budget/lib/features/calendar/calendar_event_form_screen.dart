@@ -1,3 +1,4 @@
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/core/supabase_client.dart';
 import 'package:ppyu_budget/features/calendar/calendar_event_repository.dart';
@@ -265,7 +266,7 @@ class _CalendarEventFormScreenState extends State<CalendarEventFormScreen> {
                   );
                 }).toList(),
               ),
-            if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+            if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.error)),
             ElevatedButton(
               onPressed: _saving ? null : _save,
               child: const Text('저장'),

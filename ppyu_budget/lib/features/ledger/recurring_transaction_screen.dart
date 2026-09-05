@@ -1,3 +1,4 @@
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/features/ads/ad_banner_widget.dart' show adBannerHeight;
 import 'package:ppyu_budget/features/household/invite_screen.dart' show householdRepository;
@@ -68,7 +69,7 @@ class _RecurringTransactionListScreenState extends State<RecurringTransactionLis
       ),
       body: Column(
         children: [
-          if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+          if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.error)),
           Expanded(
             child: templates == null
                 ? const Center(child: CircularProgressIndicator())
@@ -339,7 +340,7 @@ class _RecurringTransactionFormScreenState extends State<RecurringTransactionFor
       return Scaffold(
         appBar: AppBar(title: Text(existing == null ? '반복거래 추가' : '반복거래 수정')),
         body: _error != null
-            ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+            ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.error)))
             : const Center(child: CircularProgressIndicator()),
       );
     }
@@ -433,7 +434,7 @@ class _RecurringTransactionFormScreenState extends State<RecurringTransactionFor
                   );
                 }).toList(),
               ),
-            if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+            if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.error)),
             ElevatedButton(
               onPressed: _saving ? null : _save,
               child: const Text('저장'),

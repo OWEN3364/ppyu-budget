@@ -1,3 +1,4 @@
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -70,7 +71,7 @@ class _JoinScreenState extends State<JoinScreen> {
               onPressed: _joining ? null : () => _join(_controller.text.trim()),
               child: const Text('코드로 연동'),
             ),
-            if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+            if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.error)),
             const Divider(height: 32),
             SizedBox(
               height: 250,

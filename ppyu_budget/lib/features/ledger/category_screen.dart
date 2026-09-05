@@ -1,3 +1,4 @@
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/core/supabase_client.dart';
 import 'package:ppyu_budget/features/ledger/category_repository.dart';
@@ -76,7 +77,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
       appBar: AppBar(title: const Text('카테고리 관리')),
       body: Column(
         children: [
-          if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+          if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.error)),
           Expanded(
             child: categories == null
                 ? const Center(child: CircularProgressIndicator())

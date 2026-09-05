@@ -1,3 +1,4 @@
+import 'package:ppyu_budget/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/features/ads/ad_banner_widget.dart' show adBannerHeight;
 import 'package:ppyu_budget/features/household/invite_screen.dart' show householdRepository;
@@ -113,7 +114,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
           if (_error != null)
             Padding(
               padding: const EdgeInsets.all(8),
-              child: Text(_error!, style: const TextStyle(color: Colors.red)),
+              child: Text(_error!, style: const TextStyle(color: AppColors.error)),
             ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
