@@ -6,11 +6,16 @@ class AppColors {
   AppColors._();
 
   static const orange = Color(0xFFE2A16F);
-  static const beige = Color(0xFFFFF0DD);
+
+  /// 종이 배경 — 예전엔 크림베이지(#FFF0DD)였는데 누렇고 구식으로 보인다는
+  /// 피드백으로 흰색으로 변경.
+  static const beige = Colors.white;
+
   static const grey = Color(0xFFD1D3D4);
   static const teal = Color(0xFF86B0BD);
 
-  /// 카드/타일처럼 배경(beige)보다 한 단계 밝게 얹히는 종이색.
+  /// 카드/타일 배경 — 지금은 beige와 같은 흰색이지만, 카드 쪽 색만 따로
+  /// 바꿀 수 있도록 별도 상수로 유지.
   static const paper = Colors.white;
 
   /// 본문 텍스트 — 순검정 대신 부드러운 다크그레이.

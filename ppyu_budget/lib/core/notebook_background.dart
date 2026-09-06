@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ppyu_budget/core/app_theme.dart';
 
-/// 다이어리 속지 느낌의 배경 — 베이지 바탕 위에 옅은 가로줄.
+/// 다이어리 속지 느낌의 배경 — 흰 바탕 위에 옅은 가로줄.
 ///
 /// [lined]를 false로 주면 줄 없는 무지 배경이 된다. 지금은 파라미터로만
 /// 제어하고, "줄 있음/없음" 사용자 설정 화면은 다이어리 꾸미기 단계에서
